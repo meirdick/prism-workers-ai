@@ -1,0 +1,42 @@
+{
+    "name": "meirdick/prism-workers-ai",
+    "description": "Cloudflare Workers AI provider for Prism PHP — routes through AI Gateway /compat endpoint",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "prism-php/prism": "^0.99"
+    },
+    "suggest": {
+        "laravel/ai": "Required for agent() integration (^0.3)"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0",
+        "pestphp/pest": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PrismWorkersAi\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "PrismWorkersAi\\WorkersAiServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

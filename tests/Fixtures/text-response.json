@@ -1,0 +1,21 @@
+{
+    "id": "chatcmpl-workers-ai-001",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "Hello! How can I help you today?"
+            },
+            "finish_reason": "stop"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 8,
+        "total_tokens": 18
+    }
+}
