@@ -17,7 +17,7 @@ it('can generate structured output from string content', function () {
     ]);
 
     $response = Prism::structured()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withSchema(new ObjectSchema(
             name: 'intent',
             description: 'User intent classification',
@@ -44,7 +44,7 @@ it('handles object content from Workers AI without TypeError', function () {
     ]);
 
     $response = Prism::structured()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withSchema(new ObjectSchema(
             name: 'intent',
             description: 'User intent classification',
@@ -70,7 +70,7 @@ it('sends json_schema response format', function () {
     ]);
 
     Prism::structured()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withSchema(new ObjectSchema(
             name: 'intent',
             description: 'User intent classification',

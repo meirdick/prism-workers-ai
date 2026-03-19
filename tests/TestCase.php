@@ -22,7 +22,7 @@ abstract class TestCase extends BaseTestCase
     {
         $app['config']->set('prism.providers.workers-ai', [
             'api_key' => 'test-api-key',
-            'url' => 'https://gateway.ai.cloudflare.com/v1/test/gateway/workers-ai/v1',
+            'url' => 'https://gateway.ai.cloudflare.com/v1/test/gateway/compat',
         ]);
     }
 

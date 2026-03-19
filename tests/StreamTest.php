@@ -17,7 +17,7 @@ it('can stream text responses', function () {
     ]);
 
     $stream = Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withPrompt('Hello!')
         ->asStream();
 
@@ -50,7 +50,7 @@ it('sends string content and stream flag in stream requests', function () {
     ]);
 
     $stream = Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withPrompt('Hello!')
         ->asStream();
 

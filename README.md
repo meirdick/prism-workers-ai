@@ -57,6 +57,17 @@ WORKERS_AI_URL=https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_slug}/
 
 Create a Cloudflare API token with `Workers AI: Read` permission at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
 
+### Understanding the `workers-ai/` model prefix
+
+The AI Gateway has two OpenAI-compatible endpoints for Workers AI:
+
+| Endpoint | URL | Model format |
+|----------|-----|-------------|
+| Universal (recommended) | `.../compat` | `workers-ai/@cf/meta/...` |
+| Provider-specific | `.../workers-ai/v1` | `@cf/meta/...` |
+
+This package targets the `/compat` endpoint. The `workers-ai/` prefix in model names tells the gateway which provider to route to. The gateway strips the prefix internally — responses return just `@cf/...`.
+
 ## Usage
 
 ### With Prism PHP
@@ -140,6 +151,16 @@ The package registers a `workers-ai` provider at two levels:
 2. **Laravel AI SDK layer** — via `AiManager::extend()`, bridging the `workers-ai` driver to the Prism provider
 
 The Laravel AI SDK bridge includes a `PrismGateway` subclass that overrides `configure()` to pass the driver name as a string to Prism, bypassing the SDK's hardcoded provider enum mapping. This override auto-disables itself when `laravel/ai` adds native support for custom Prism providers ([laravel/ai#283](https://github.com/laravel/ai/issues/283), [laravel/ai#284](https://github.com/laravel/ai/pull/284)).
+
+## Automated Setup
+
+For a fully automated setup — including AI Gateway routing, environment configuration, and Workers AI registration — use the [laravel-cloudflare-ai-gateway](https://github.com/meirdick/laravel-cloudflare-ai-gateway) Claude Code skill:
+
+```bash
+npx skills add meirdick/laravel-cloudflare-ai-gateway
+```
+
+It handles installing this package, configuring your gateway URL, and wiring up all providers in a single guided workflow.
 
 ## Testing
 

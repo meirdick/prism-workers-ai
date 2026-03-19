@@ -1,0 +1,12 @@
+data: {"id":"chatcmpl-stream-tc","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-tc","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_stream_abc","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-tc","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"location\":"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-tc","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \"San Francisco\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-tc","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":20,"completion_tokens":15,"total_tokens":35}}
+
+data: [DONE]
+

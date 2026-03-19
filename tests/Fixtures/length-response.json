@@ -1,0 +1,21 @@
+{
+    "id": "chatcmpl-workers-ai-length",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "This response was truncated because it hit the max"
+            },
+            "finish_reason": "length"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 2048,
+        "total_tokens": 2058
+    }
+}

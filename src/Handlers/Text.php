@@ -51,8 +51,7 @@ class Text
 
         return match ($finishReason) {
             FinishReason::ToolCalls => $this->handleToolCalls($data, $request),
-            FinishReason::Stop, FinishReason::Length => $this->handleStop($data, $request),
-            default => throw new PrismException('Workers AI: unknown finish reason'),
+            default => $this->handleStop($data, $request),
         };
     }
 

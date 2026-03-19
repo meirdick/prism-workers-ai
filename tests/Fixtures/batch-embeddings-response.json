@@ -1,0 +1,25 @@
+{
+    "object": "list",
+    "data": [
+        {
+            "object": "embedding",
+            "embedding": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "index": 0
+        },
+        {
+            "object": "embedding",
+            "embedding": [0.6, 0.7, 0.8, 0.9, 1.0],
+            "index": 1
+        },
+        {
+            "object": "embedding",
+            "embedding": [0.11, 0.22, 0.33, 0.44, 0.55],
+            "index": 2
+        }
+    ],
+    "model": "@cf/baai/bge-large-en-v1.5",
+    "usage": {
+        "prompt_tokens": 15,
+        "total_tokens": 15
+    }
+}

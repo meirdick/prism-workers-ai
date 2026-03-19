@@ -22,7 +22,7 @@ it('handles tool call responses', function () {
         ->using(fn (string $location) => "72°F in {$location}");
 
     $response = Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withTools([$tool])
         ->withMaxSteps(3)
         ->withPrompt('What is the weather in San Francisco?')
@@ -53,7 +53,7 @@ it('sends tool definitions in request payload', function () {
         ->using(fn (string $location) => "72°F in {$location}");
 
     Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withTools([$tool])
         ->withPrompt('What is the weather?')
         ->asText();
@@ -82,7 +82,7 @@ it('sends assistant content as string in tool call follow-up', function () {
         ->using(fn (string $location) => "72°F in {$location}");
 
     Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withTools([$tool])
         ->withMaxSteps(3)
         ->withPrompt('What is the weather in SF?')

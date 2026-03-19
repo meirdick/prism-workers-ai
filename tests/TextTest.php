@@ -14,7 +14,7 @@ it('can generate text', function () {
     ]);
 
     $response = Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withPrompt('Hello!')
         ->asText();
 
@@ -32,7 +32,7 @@ it('sends string content for user messages', function () {
     ]);
 
     Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withPrompt('Hello!')
         ->asText();
 
@@ -53,7 +53,7 @@ it('handles object content in responses without crashing', function () {
     ]);
 
     $response = Prism::text()
-        ->using('workers-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
         ->withPrompt('What is the intent?')
         ->asText();
 

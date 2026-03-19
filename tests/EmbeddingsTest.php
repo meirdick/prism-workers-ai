@@ -13,7 +13,7 @@ it('can generate embeddings', function () {
     ]);
 
     $response = Prism::embeddings()
-        ->using('workers-ai', '@cf/baai/bge-large-en-v1.5')
+        ->using('workers-ai', 'workers-ai/@cf/baai/bge-large-en-v1.5')
         ->fromInput('Hello world')
         ->generate();
 
@@ -30,14 +30,14 @@ it('sends correct payload for embeddings', function () {
     ]);
 
     Prism::embeddings()
-        ->using('workers-ai', '@cf/baai/bge-large-en-v1.5')
+        ->using('workers-ai', 'workers-ai/@cf/baai/bge-large-en-v1.5')
         ->fromInput('Hello world')
         ->generate();
 
     Http::assertSent(function ($request) {
         $body = json_decode($request->body(), true);
 
-        return $body['model'] === '@cf/baai/bge-large-en-v1.5'
+        return $body['model'] === 'workers-ai/@cf/baai/bge-large-en-v1.5'
             && str_contains($request->url(), 'embeddings');
     });
 });

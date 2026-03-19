@@ -19,7 +19,7 @@ it('resolves provider with correct config from prism.providers', function () {
     $provider = $manager->resolve('workers-ai');
 
     expect($provider->apiKey)->toBe('test-api-key');
-    expect($provider->url)->toBe('https://gateway.ai.cloudflare.com/v1/test/gateway/workers-ai/v1');
+    expect($provider->url)->toBe('https://gateway.ai.cloudflare.com/v1/test/gateway/compat');
 });
 
 it('registers workers-ai driver with AiManager when laravel/ai is installed', function () {
