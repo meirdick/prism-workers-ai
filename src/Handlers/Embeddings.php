@@ -32,7 +32,7 @@ class Embeddings
                 fn (array $item): Embedding => Embedding::fromArray($item['embedding']),
                 data_get($data, 'data', [])
             ),
-            usage: new EmbeddingsUsage(data_get($data, 'usage.total_tokens')),
+            usage: new EmbeddingsUsage(data_get($data, 'usage.total_tokens', 0)),
             meta: new Meta(
                 id: '',
                 model: data_get($data, 'model', ''),
