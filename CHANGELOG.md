@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.2 — 2026-03-30
+
+### Defensive
+
+- **Graceful fallback if `PrismGateway` is removed** — Laravel AI is moving providers to direct gateways that bypass Prism. If a future `laravel/ai` version removes `PrismGateway`, the service provider now logs a warning and disables the Laravel AI bridge instead of crashing. Prism standalone usage is unaffected.
+
 ## v0.4.0 — 2026-03-22
 
 ### Features

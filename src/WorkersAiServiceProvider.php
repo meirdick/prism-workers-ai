@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PrismWorkersAi;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Prism\Prism\PrismManager;
 use ReflectionMethod;
@@ -48,6 +49,17 @@ class WorkersAiServiceProvider extends ServiceProvider
     protected function registerWithLaravelAi(): void
     {
         if (! class_exists(\Laravel\Ai\AiManager::class)) {
+            return;
+        }
+
+        if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
+            Log::warning(
+                'meirdick/prism-workers-ai: PrismGateway has been removed from laravel/ai. '
+                . 'The workers-ai Laravel AI integration is disabled until a direct gateway is available. '
+                . 'Prism standalone (Prism::text()->using("workers-ai", ...)) still works. '
+                . 'Update meirdick/prism-workers-ai for a compatible version.'
+            );
+
             return;
         }
 
