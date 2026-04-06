@@ -21,6 +21,12 @@ trait ExtractsThinking
             return $reasoning;
         }
 
+        $reasoning = data_get($data, 'choices.0.delta.reasoning') ?? '';
+
+        if ($reasoning !== '') {
+            return $reasoning;
+        }
+
         return data_get($data, 'choices.0.delta.thinking') ?? '';
     }
 

@@ -1,0 +1,12 @@
+data: {"id":"chatcmpl-gemma-stream-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/google/gemma-4-26b-a4b-it","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-gemma-stream-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/google/gemma-4-26b-a4b-it","choices":[{"index":0,"delta":{"reasoning":"The user asked"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-gemma-stream-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/google/gemma-4-26b-a4b-it","choices":[{"index":0,"delta":{"reasoning":" what 2+2 is."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-gemma-stream-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/google/gemma-4-26b-a4b-it","choices":[{"index":0,"delta":{"content":"4"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-gemma-stream-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/google/gemma-4-26b-a4b-it","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":20,"completion_tokens":50,"total_tokens":70}}
+
+data: [DONE]
+

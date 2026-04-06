@@ -63,6 +63,63 @@ it('returns empty additionalContent for non-reasoning models', function () {
     expect($response->steps[0]->additionalContent)->toBe([]);
 });
 
+it('extracts reasoning field from Gemma 4 non-streaming response', function () {
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('gemma-reasoning-response.json'),
+        ),
+    ]);
+
+    $response = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/google/gemma-4-26b-a4b-it')
+        ->withPrompt('What is 2+2?')
+        ->asText();
+
+    expect($response->text)->toBe('4');
+    expect($response->finishReason)->toBe(FinishReason::Stop);
+    expect($response->steps[0]->additionalContent)->toHaveKey('thinking');
+    expect($response->steps[0]->additionalContent['thinking'])
+        ->toBe('The user asked what 2+2 is. The answer is 4.');
+});
+
+it('streams thinking events from Gemma 4 using reasoning field', function () {
+    $streamBody = file_get_contents(__DIR__.'/Fixtures/gemma-reasoning-stream-response.txt');
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response($streamBody, 200, [
+            'Content-Type' => 'text/event-stream',
+        ]),
+    ]);
+
+    $stream = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/google/gemma-4-26b-a4b-it')
+        ->withPrompt('What is 2+2?')
+        ->asStream();
+
+    $events = [];
+    $thinkingText = '';
+    $contentText = '';
+
+    foreach ($stream as $event) {
+        $events[] = $event;
+        if ($event instanceof ThinkingEvent) {
+            $thinkingText .= $event->delta;
+        }
+        if ($event instanceof TextDeltaEvent) {
+            $contentText .= $event->delta;
+        }
+    }
+
+    expect($thinkingText)->toBe('The user asked what 2+2 is.');
+    expect($contentText)->toBe('4');
+
+    $thinkingStarts = array_filter($events, fn ($e) => $e instanceof ThinkingStartEvent);
+    expect($thinkingStarts)->toHaveCount(1);
+
+    $thinkingCompletes = array_filter($events, fn ($e) => $e instanceof ThinkingCompleteEvent);
+    expect($thinkingCompletes)->toHaveCount(1);
+});
+
 it('streams thinking events from reasoning model', function () {
     $streamBody = file_get_contents(__DIR__.'/Fixtures/reasoning-stream-response.txt');
 

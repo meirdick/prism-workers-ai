@@ -1,0 +1,28 @@
+{
+    "id": "chatcmpl-gemma-reason-001",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "4",
+                "reasoning": "The user asked what 2+2 is. The answer is 4.",
+                "refusal": null,
+                "tool_calls": []
+            },
+            "finish_reason": "stop",
+            "logprobs": null
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 20,
+        "completion_tokens": 50,
+        "total_tokens": 70,
+        "prompt_tokens_details": {
+            "cached_tokens": 0
+        }
+    }
+}

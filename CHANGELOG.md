@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.3 — 2026-04-06
+
+### Fixes
+
+- **Streaming reasoning extraction for Gemma 4** — Cloudflare's compat endpoint surfaces Gemma 4's chain-of-thought in `delta.reasoning` (streaming) and `message.reasoning` (non-streaming), not the `reasoning_content` field used by Kimi K2.5. The streaming `ExtractsThinking` trait now checks `delta.reasoning` as a fallback. Non-streaming already handled this. Forward-compatible: when Cloudflare normalizes to `reasoning_content`, that check hits first — no code change needed.
+
+### Tests
+
+- 2 new Gemma 4 reasoning tests (non-streaming + streaming extraction via `reasoning` field)
+- 2 new fixtures: `gemma-reasoning-response.json`, `gemma-reasoning-stream-response.txt`
+- 70 tests, 140 assertions total
+
 ## v0.4.2 — 2026-03-30
 
 ### Defensive
