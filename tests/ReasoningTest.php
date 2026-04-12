@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Http;
 use Prism\Prism\Enums\FinishReason;
 use Prism\Prism\Facades\Prism;
+use Prism\Prism\Streaming\Events\StreamEndEvent;
 use Prism\Prism\Streaming\Events\TextDeltaEvent;
 use Prism\Prism\Streaming\Events\ThinkingEvent;
 use Prism\Prism\Streaming\Events\ThinkingStartEvent;
@@ -156,4 +157,99 @@ it('streams thinking events from reasoning model', function () {
 
     $thinkingCompletes = array_filter($events, fn ($e) => $e instanceof ThinkingCompleteEvent);
     expect($thinkingCompletes)->toHaveCount(1);
+});
+
+it('streams ThinkingCompleteEvent when reasoning exhausts max_tokens', function () {
+    $streamBody = file_get_contents(__DIR__.'/Fixtures/reasoning-exhausted-stream-response.txt');
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response($streamBody, 200, [
+            'Content-Type' => 'text/event-stream',
+        ]),
+    ]);
+
+    $stream = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.5')
+        ->withPrompt('Say hello in one sentence.')
+        ->asStream();
+
+    $events = [];
+    $thinkingText = '';
+    $contentText = '';
+
+    foreach ($stream as $event) {
+        $events[] = $event;
+        if ($event instanceof ThinkingEvent) {
+            $thinkingText .= $event->delta;
+        }
+        if ($event instanceof TextDeltaEvent) {
+            $contentText .= $event->delta;
+        }
+    }
+
+    expect($contentText)->toBe('');
+    expect($thinkingText)->toBe('The user wants me to say hello. I need to think carefully.');
+
+    $thinkingStarts = array_filter($events, fn ($e) => $e instanceof ThinkingStartEvent);
+    expect($thinkingStarts)->toHaveCount(1);
+
+    $thinkingCompletes = array_filter($events, fn ($e) => $e instanceof ThinkingCompleteEvent);
+    expect($thinkingCompletes)->toHaveCount(1);
+
+    $streamEnd = array_values(array_filter($events, fn ($e) => $e instanceof StreamEndEvent));
+    expect($streamEnd)->toHaveCount(1);
+    expect($streamEnd[0]->finishReason)->toBe(FinishReason::Length);
+});
+
+it('includes accumulated thinking in StreamEndEvent additionalContent', function () {
+    $streamBody = file_get_contents(__DIR__.'/Fixtures/reasoning-stream-response.txt');
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response($streamBody, 200, [
+            'Content-Type' => 'text/event-stream',
+        ]),
+    ]);
+
+    $stream = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.5')
+        ->withPrompt('Say hello in one sentence.')
+        ->asStream();
+
+    $events = [];
+    foreach ($stream as $event) {
+        $events[] = $event;
+    }
+
+    $streamEnd = array_values(array_filter($events, fn ($e) => $e instanceof StreamEndEvent));
+    expect($streamEnd)->toHaveCount(1);
+    expect($streamEnd[0]->additionalContent)->toHaveKey('thinking');
+    expect($streamEnd[0]->additionalContent['thinking'])
+        ->toBe('The user wants me to say hello.');
+});
+
+it('includes accumulated thinking when reasoning exhausts max_tokens', function () {
+    $streamBody = file_get_contents(__DIR__.'/Fixtures/reasoning-exhausted-stream-response.txt');
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response($streamBody, 200, [
+            'Content-Type' => 'text/event-stream',
+        ]),
+    ]);
+
+    $stream = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.5')
+        ->withPrompt('Say hello in one sentence.')
+        ->asStream();
+
+    $events = [];
+    foreach ($stream as $event) {
+        $events[] = $event;
+    }
+
+    $streamEnd = array_values(array_filter($events, fn ($e) => $e instanceof StreamEndEvent));
+    expect($streamEnd)->toHaveCount(1);
+    expect($streamEnd[0]->finishReason)->toBe(FinishReason::Length);
+    expect($streamEnd[0]->additionalContent)->toHaveKey('thinking');
+    expect($streamEnd[0]->additionalContent['thinking'])
+        ->toBe('The user wants me to say hello. I need to think carefully.');
 });

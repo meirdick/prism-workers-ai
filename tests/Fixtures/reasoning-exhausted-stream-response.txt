@@ -1,0 +1,12 @@
+data: {"id":"chatcmpl-stream-exhaust-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.5","choices":[{"index":0,"delta":{"role":"assistant","content":"","reasoning_content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-exhaust-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.5","choices":[{"index":0,"delta":{"reasoning_content":"The user wants me"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-exhaust-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.5","choices":[{"index":0,"delta":{"reasoning_content":" to say hello."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-exhaust-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.5","choices":[{"index":0,"delta":{"reasoning_content":" I need to think carefully."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-exhaust-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.5","choices":[{"index":0,"delta":{},"finish_reason":"length"}],"usage":{"prompt_tokens":14,"completion_tokens":30,"total_tokens":44}}
+
+data: [DONE]
+

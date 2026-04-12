@@ -163,6 +163,7 @@ class Text
             usage: new Usage(
                 data_get($data, 'usage.prompt_tokens', 0),
                 data_get($data, 'usage.completion_tokens', 0),
+                thoughtTokens: data_get($data, 'usage.reasoning_tokens'),
             ),
             meta: new Meta(
                 id: data_get($data, 'id', ''),

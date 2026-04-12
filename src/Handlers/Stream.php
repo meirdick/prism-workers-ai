@@ -127,6 +127,8 @@ class Stream
                     );
                 }
 
+                $this->state->appendThinking($thinkingContent);
+
                 yield new ThinkingEvent(
                     id: EventID::generate(),
                     timestamp: time(),
@@ -182,6 +184,17 @@ class Stream
                     $this->state->withFinishReason($finishReason);
                 }
 
+                // Complete thinking if it was started but not completed
+                // (e.g. reasoning exhausted max_tokens with no content)
+                if ($this->state->hasThinkingStarted()) {
+                    yield new ThinkingCompleteEvent(
+                        id: EventID::generate(),
+                        timestamp: time(),
+                        reasoningId: $this->state->reasoningId()
+                    );
+                    $this->state->resetTextState();
+                }
+
                 $usage = $this->extractUsage($data);
                 if ($usage instanceof Usage) {
                     $this->state->addUsage($usage);
@@ -231,6 +244,9 @@ class Stream
             timestamp: time(),
             finishReason: $this->state->finishReason() ?? FinishReason::Stop,
             usage: $this->state->usage() ?? new Usage(0, 0),
+            additionalContent: $this->state->thinkingSummaries() !== []
+                ? ['thinking' => implode('', $this->state->thinkingSummaries())]
+                : [],
         );
     }
 
@@ -338,6 +354,7 @@ class Stream
         return new Usage(
             promptTokens: data_get($usage, 'prompt_tokens', 0),
             completionTokens: data_get($usage, 'completion_tokens', 0),
+            thoughtTokens: data_get($usage, 'reasoning_tokens'),
         );
     }
 
