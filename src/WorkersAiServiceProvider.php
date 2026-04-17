@@ -40,11 +40,10 @@ class WorkersAiServiceProvider extends ServiceProvider
      *
      * This enables: agent()->prompt('Hello', provider: 'workers-ai')
      *
-     * When laravel/ai natively supports custom Prism providers (i.e.
-     * toPrismProvider() returns string|PrismProvider), we skip the
-     * gateway override and use the standard PrismGateway directly.
-     *
-     * @see https://github.com/laravel/ai/issues/283
+     * Gateway selection priority:
+     * 1. Native WorkersAiGateway — when laravel/ai has InvokesTools trait (v0.5+)
+     * 2. Custom PrismGateway override — when toPrismProvider() doesn't support strings
+     * 3. Standard PrismGateway — when laravel/ai natively supports custom providers
      */
     protected function registerWithLaravelAi(): void
     {
@@ -52,21 +51,35 @@ class WorkersAiServiceProvider extends ServiceProvider
             return;
         }
 
-        if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
+        $useNative = $this->supportsNativeGateway();
+
+        if (! $useNative && ! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
             Log::warning(
-                'meirdick/prism-workers-ai: PrismGateway has been removed from laravel/ai. '
-                . 'The workers-ai Laravel AI integration is disabled until a direct gateway is available. '
-                . 'Prism standalone (Prism::text()->using("workers-ai", ...)) still works. '
+                'meirdick/prism-workers-ai: PrismGateway has been removed from laravel/ai '
+                . 'but native gateway prerequisites are missing. '
+                . 'The workers-ai Laravel AI integration is disabled. '
                 . 'Update meirdick/prism-workers-ai for a compatible version.'
             );
 
             return;
         }
 
-        $useOverride = $this->needsGatewayOverride();
+        $useOverride = ! $useNative && $this->needsGatewayOverride();
 
-        $this->app->afterResolving(\Laravel\Ai\AiManager::class, function ($manager) use ($useOverride) {
-            $manager->extend(WorkersAi::KEY, function ($app, array $config) use ($useOverride) {
+        $this->app->afterResolving(\Laravel\Ai\AiManager::class, function ($manager) use ($useNative, $useOverride) {
+            $manager->extend(WorkersAi::KEY, function ($app, array $config) use ($useNative, $useOverride) {
+                $dispatcher = $app->make(\Illuminate\Contracts\Events\Dispatcher::class);
+
+                if ($useNative) {
+                    $gateway = new Gateway\WorkersAiGateway($dispatcher);
+
+                    return new LaravelAi\WorkersAiProvider(
+                        $gateway,
+                        $config,
+                        $dispatcher,
+                    );
+                }
+
                 $gateway = $useOverride
                     ? new LaravelAi\WorkersAiGateway($app['events'])
                     : new \Laravel\Ai\Gateway\Prism\PrismGateway($app['events']);
@@ -74,10 +87,22 @@ class WorkersAiServiceProvider extends ServiceProvider
                 return new LaravelAi\WorkersAiProvider(
                     $gateway,
                     $config,
-                    $app->make(\Illuminate\Contracts\Events\Dispatcher::class),
+                    $dispatcher,
                 );
             });
         });
+    }
+
+    /**
+     * Check whether laravel/ai supports the native gateway pattern.
+     *
+     * The InvokesTools trait was introduced alongside native gateways in v0.5.
+     * Its presence indicates laravel/ai has the required interfaces and
+     * shared traits (HandlesFailoverErrors, ParsesServerSentEvents, etc.).
+     */
+    protected function supportsNativeGateway(): bool
+    {
+        return trait_exists(\Laravel\Ai\Gateway\Concerns\InvokesTools::class);
     }
 
     /**

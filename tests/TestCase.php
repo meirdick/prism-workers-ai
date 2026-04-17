@@ -12,10 +12,16 @@ abstract class TestCase extends BaseTestCase
 {
     protected function getPackageProviders($app): array
     {
-        return [
+        $providers = [
             PrismServiceProvider::class,
             WorkersAiServiceProvider::class,
         ];
+
+        if (class_exists(\Laravel\Ai\AiServiceProvider::class)) {
+            $providers[] = \Laravel\Ai\AiServiceProvider::class;
+        }
+
+        return $providers;
     }
 
     protected function defineEnvironment($app): void

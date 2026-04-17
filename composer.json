@@ -11,7 +11,8 @@
         "laravel/ai": "Required for agent() integration (^0.3 || ^0.4 || ^0.5)"
     },
     "require-dev": {
-        "orchestra/testbench": "^9.0",
+        "laravel/ai": "^0.5",
+        "orchestra/testbench": "^10.0",
         "pestphp/pest": "^3.0"
     },
     "autoload": {
