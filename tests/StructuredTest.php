@@ -62,6 +62,34 @@ it('handles object content from Workers AI without TypeError', function () {
     expect($response->structured['intent'])->toBe('greeting');
 });
 
+it('tracks thoughtTokens and thinking from reasoning models', function () {
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('structured-response-with-reasoning.json'),
+        ),
+    ]);
+
+    $response = Prism::structured()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.5')
+        ->withSchema(new ObjectSchema(
+            name: 'intent',
+            description: 'User intent classification',
+            properties: [
+                new StringSchema('intent', 'The detected intent'),
+                new NumberSchema('confidence', 'Confidence score'),
+            ],
+            requiredFields: ['intent', 'confidence'],
+        ))
+        ->withPrompt('Classify: Hello there!')
+        ->generate();
+
+    expect($response->structured['intent'])->toBe('greeting');
+    expect($response->usage->thoughtTokens)->toBe(15);
+    expect($response->steps[0]->additionalContent)->toHaveKey('thinking');
+    expect($response->steps[0]->additionalContent['thinking'])
+        ->toBe('The user said hello, so this is clearly a greeting with high confidence.');
+});
+
 it('sends json_schema response format', function () {
     Http::fake([
         'gateway.ai.cloudflare.com/*' => Http::response(

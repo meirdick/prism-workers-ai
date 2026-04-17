@@ -354,6 +354,7 @@ class Stream
         return new Usage(
             promptTokens: data_get($usage, 'prompt_tokens', 0),
             completionTokens: data_get($usage, 'completion_tokens', 0),
+            cacheReadInputTokens: data_get($usage, 'prompt_tokens_details.cached_tokens'),
             thoughtTokens: data_get($usage, 'reasoning_tokens'),
         );
     }

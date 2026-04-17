@@ -84,6 +84,8 @@ class Structured
             usage: new Usage(
                 promptTokens: data_get($data, 'usage.prompt_tokens', 0),
                 completionTokens: data_get($data, 'usage.completion_tokens', 0),
+                cacheReadInputTokens: data_get($data, 'usage.prompt_tokens_details.cached_tokens'),
+                thoughtTokens: data_get($data, 'usage.reasoning_tokens'),
             ),
             meta: new Meta(
                 id: data_get($data, 'id', ''),

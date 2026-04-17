@@ -157,12 +157,13 @@ class Text
         $this->responseBuilder->addStep(new Step(
             text: $content,
             finishReason: $this->mapFinishReason($data),
-            toolCalls: $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls', [])),
+            toolCalls: $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls') ?? []),
             toolResults: $toolResults,
             providerToolCalls: [],
             usage: new Usage(
                 data_get($data, 'usage.prompt_tokens', 0),
                 data_get($data, 'usage.completion_tokens', 0),
+                cacheReadInputTokens: data_get($data, 'usage.prompt_tokens_details.cached_tokens'),
                 thoughtTokens: data_get($data, 'usage.reasoning_tokens'),
             ),
             meta: new Meta(

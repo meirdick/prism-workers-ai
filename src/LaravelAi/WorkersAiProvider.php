@@ -34,7 +34,7 @@ class WorkersAiProvider extends Provider implements TextProvider, EmbeddingProvi
 
     public function smartestTextModel(): string
     {
-        return $this->config['models']['text']['smartest'] ?? 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+        return $this->config['models']['text']['smartest'] ?? 'workers-ai/@cf/moonshotai/kimi-k2.5';
     }
 
     public function defaultEmbeddingsModel(): string
