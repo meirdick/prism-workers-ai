@@ -1,0 +1,8 @@
+data: {"id":"chatcmpl-stream-cache-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-cache-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-cache-001","object":"chat.completion.chunk","created":1700000000,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":1,"total_tokens":51,"prompt_tokens_details":{"cached_tokens":42}}}
+
+data: [DONE]
+

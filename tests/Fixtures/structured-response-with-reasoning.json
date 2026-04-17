@@ -1,0 +1,23 @@
+{
+    "id": "chatcmpl-workers-ai-structured-reasoning-001",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "@cf/moonshotai/kimi-k2.5",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"intent\": \"greeting\", \"confidence\": 0.95}",
+                "reasoning_content": "The user said hello, so this is clearly a greeting with high confidence."
+            },
+            "finish_reason": "stop"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 20,
+        "completion_tokens": 12,
+        "total_tokens": 32,
+        "reasoning_tokens": 15
+    }
+}

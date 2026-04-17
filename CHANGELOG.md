@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.4.6 — 2026-04-17
+
+### Features
+
+- **Prefix cache metrics** — `cacheReadInputTokens` is now populated in `Usage` for text, streaming, and structured responses when Workers AI returns `prompt_tokens_details.cached_tokens`. Pair with session affinity for multi-turn cache hits.
+
+### Fixes
+
+- **Missing `thoughtTokens` in Structured handler** — Reasoning models used with structured output now correctly report `thoughtTokens` and `additionalContent['thinking']`. Previously only the Text and Stream handlers tracked these.
+- **Null `tool_calls` crash on reasoning models** — Kimi K2.5 returns `"tool_calls": null` (not absent) in responses, causing a TypeError in `mapToolCalls()`. Now handles null gracefully.
+
+### Changes
+
+- **`smartestTextModel` default updated to Kimi K2.5** — The Laravel AI SDK `smartestTextModel()` fallback now returns `workers-ai/@cf/moonshotai/kimi-k2.5` instead of `llama-3.3-70b-instruct-fp8-fast` (which was identical to `defaultTextModel()`). Configurable via `models.text.smartest` in provider config.
+
+### Docs
+
+- Added new models from Cloudflare Agents Week 2026: Qwen3-30B (efficient MoE), GLM-4.7-flash (131K context), Qwen3-embedding, EmbeddingGemma-300M
+- Documented prefix cache metrics in session affinity section
+- Added embedding dimension note for non-1024 models
+
 ## v0.4.3 — 2026-04-06
 
 ### Fixes

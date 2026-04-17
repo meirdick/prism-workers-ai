@@ -137,6 +137,9 @@ $response = Prism::text()
     ->withMaxTokens(2000)
     ->withPrompt('Follow-up question...')
     ->asText();
+
+// Prefix cache metrics are available in usage when the API returns them
+$response->usage->cacheReadInputTokens; // cached prompt tokens (null if no cache hit)
 ```
 
 ### With Laravel AI SDK
@@ -167,10 +170,16 @@ class MyAgent implements Agent, Conversational { ... }
 |-------|----------|
 | `workers-ai/@cf/moonshotai/kimi-k2.5` | Frontier — smartest (256K context, reasoning, vision, tool calling) |
 | `workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast` | General purpose (best quality/speed) |
+| `workers-ai/@cf/qwen/qwen3-30b-a3b-fp8` | Efficient MoE (30B total / 3B active, 32K context) |
+| `workers-ai/@cf/zai-org/glm-4.7-flash` | Long document summarization (131K context) |
 | `workers-ai/@cf/meta/llama-3.1-8b-instruct` | Fast/cheap tasks |
 | `workers-ai/@cf/qwen/qwq-32b` | Reasoning |
 | `workers-ai/@cf/qwen/qwen2.5-coder-32b-instruct` | Code generation |
 | `workers-ai/@cf/baai/bge-large-en-v1.5` | Embeddings (1024 dimensions) |
+| `workers-ai/@cf/qwen/qwen3-embedding-0.6b` | Embeddings (1024 dimensions, 4096 input tokens) |
+| `workers-ai/@cf/google/embeddinggemma-300m` | Embeddings (768 dimensions, low-latency) |
+
+> **Embedding dimensions:** Most embedding models output 1024 dimensions. If using `embeddinggemma-300m` (768 dims), set `models.embeddings.dimensions` to `768` in your `config/ai.php` provider config.
 
 > **Reasoning models:** Kimi K2.5 is a thinking model — it reasons before answering. Set `withMaxTokens(2000)` or higher, as reasoning tokens count against the limit. The thinking chain is available in `$response->steps[0]->additionalContent['thinking']`.
 

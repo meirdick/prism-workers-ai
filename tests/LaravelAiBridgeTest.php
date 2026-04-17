@@ -27,15 +27,15 @@ it('registers workers-ai driver with AiManager when laravel/ai is installed', fu
         $this->markTestSkipped('laravel/ai is not installed');
     }
 
-    $manager = app(\Laravel\Ai\AiManager::class);
-
-    // Configure the ai provider
+    // Configure the ai provider before resolving AiManager
     config()->set('ai.providers.workers-ai', [
         'driver' => 'workers-ai',
         'key' => 'test-key',
         'url' => 'https://example.com/compat',
         'name' => 'workers-ai',
     ]);
+
+    $manager = app(\Laravel\Ai\AiManager::class);
 
     $provider = $manager->instance('workers-ai');
 
