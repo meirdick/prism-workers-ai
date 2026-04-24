@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.4.6 — 2026-04-23
+
+### Features
+
+- **Prefix cache metrics** — `cacheReadInputTokens` is now populated in `Usage` for text, streaming, and structured responses when Workers AI returns `prompt_tokens_details.cached_tokens`. Pair with session affinity for multi-turn cache hits.
+- **Default retry on transient errors** — HTTP client now retries 3 times with 500ms base delay (exponential backoff) on connection errors (cURL 6/7/28/56) and HTTP 502/503/504. Fixes intermittent "Connection reset by peer" failures seen against the Cloudflare AI Gateway. Three ways to control it: (a) override per-request via `withClientRetry(...)` on the Prism request, (b) disable globally by setting `retry => false` in `config/prism.php` under `providers.workers-ai`, (c) leave it on (default).
+- **`workersai` alias (dashless)** — provider is now registered under both `workers-ai` (primary) and `workersai` (alias) in Prism's `PrismManager` and Laravel AI's `AiManager`. Every other provider in the ecosystem (`openai`, `anthropic`, `xai`, `gemini`, `groq`, `mistral`, `deepseek`) is a single lowercase token with no separator, so users naturally reach for the dashless form. Without the alias, `provider: 'workersai'` errors with "Instance driver [workersai] is not supported" — which is silently caught by the defensive try/catch pattern common around AI calls, causing features to degrade to fallback output invisibly in production.
+
+### Fixes
+
+- **Missing `thoughtTokens` in Structured handler** — Reasoning models used with structured output now correctly report `thoughtTokens` and `additionalContent['thinking']`. Previously only the Text and Stream handlers tracked these.
+- **Null `tool_calls` crash on reasoning models (production fix)** — Kimi K2.5/K2.6 and other `/compat` responses emit `"tool_calls": null` (explicitly null, not absent) when `finish_reason: "stop"`. `data_get($data, '...', [])` only returns the default for missing keys, not explicit nulls — so `null` flowed into `mapToolCalls(array $toolCalls)` and crashed with `TypeError`. Fixed across all remaining sites: `Text::handleToolCalls()`, `Stream::extractToolCalls()`.
+- **Null usage token fields crash** — Same `data_get` anti-pattern: `"prompt_tokens": null` in responses flowed into `new Usage(int $promptTokens, ...)` causing TypeError. All token int fields (`prompt_tokens`, `completion_tokens`, `total_tokens`) now coalesce explicit nulls to `0` in Text, Structured, Stream, and Embeddings handlers.
+- **Empty tool `properties` array rejected by Workers AI** — Tools with zero parameters (e.g. `GetChildrenInfoTool` with `schema()` returning `[]`) produced `"properties": []` in the request payload. Workers AI's JSON Schema validator requires `properties` to be an `object` type, rejecting the empty array with "Tool X function has invalid 'parameters' schema". Fixed by coercing empty `properties` to an empty JSON object `{}`, mirroring Prism's OpenRouter provider pattern.
+- **Error messages swallowed on Cloudflare AI Gateway errors** — When the gateway returns errors in an `{ errors: [{ message: "...", code: N }] }` envelope (instead of the OpenAI-style `{ error: { message: "..." } }`), the real error message was lost and users only saw "WorkersAI Error [400]: Unknown error". The error extractor now handles both shapes plus string errors and top-level messages.
+- **Streamed tool-call argument chunks dropped when payload is `"0"` or `""`** — `Stream::extractToolCalls()` used a truthy check (`if ($arguments = data_get(...))`) that skipped falsy deltas. A tool argument like `{"count":0}` streamed as `{"count":` + `0` + `}` would lose the `0` chunk, producing malformed JSON on the accumulator. Fix by [@danwall](https://github.com/danwall) in [#2](https://github.com/meirdick/prism-workers-ai/pull/2) (`arguments` delta); extended to `id` and `name` deltas for consistency.
+
+### Contributors
+
+- [@danwall](https://github.com/danwall) — first external contribution ([#2](https://github.com/meirdick/prism-workers-ai/pull/2)). Thanks, Dan!
+
+### Changes
+
+- **`smartestTextModel` default updated to Kimi K2.5** — The Laravel AI SDK `smartestTextModel()` fallback now returns `workers-ai/@cf/moonshotai/kimi-k2.5` instead of `llama-3.3-70b-instruct-fp8-fast` (which was identical to `defaultTextModel()`). Configurable via `models.text.smartest` in provider config.
+
+### Docs
+
+- Added new models from Cloudflare Agents Week 2026: Qwen3-30B (efficient MoE), GLM-4.7-flash (131K context), Qwen3-embedding, EmbeddingGemma-300M
+- Documented prefix cache metrics in session affinity section
+- Added embedding dimension note for non-1024 models
+- **New `Compatibility` section in README** — explicit matrix of supported `laravel/ai` ranges and the v0.6 degradation story.
+- **`UPGRADING.md`** — stub for the 0.4.x → 0.5.0 migration path.
+- **`composer suggest` widened** — `laravel/ai` suggest now covers `^0.3 || ^0.4 || ^0.5 || ^0.6` with a note that the Laravel AI bridge auto-disables on v0.6+ until v0.5.0 of this package lands.
+
+### Upcoming — v0.5.0 preview
+
+The next release will introduce a **native Laravel AI gateway**, ported from the unmerged [laravel/ai#405](https://github.com/laravel/ai/pull/405) design, replacing the current `PrismGateway` subclass. This restores `agent()->prompt(provider: 'workers-ai')` on `laravel/ai` v0.6+, where upstream's removal of `PrismGateway` currently forces the Laravel AI bridge into a graceful-degradation warning.
+
+Heads-up for anyone subclassing: the constructor of `PrismWorkersAi\LaravelAi\WorkersAiProvider` will change in v0.5.0 (minor BC break, scoped to direct subclassers — ordinary users of `agent()` / config-driven registration are unaffected). Full migration notes land in `UPGRADING.md` when v0.5.0 ships.
+
 ## v0.4.3 — 2026-04-06
 
 ### Fixes

@@ -40,6 +40,55 @@ it('can stream text responses', function () {
     expect($endEvents)->toHaveCount(1);
 });
 
+it('streams cleanly when every delta has explicit-null tool_calls (Kimi K2.6)', function () {
+    $streamBody = file_get_contents(__DIR__.'/Fixtures/stream-null-fields-response.txt');
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response($streamBody, 200, [
+            'Content-Type' => 'text/event-stream',
+        ]),
+    ]);
+
+    $stream = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.6')
+        ->withPrompt('hi')
+        ->asStream();
+
+    $text = '';
+    foreach ($stream as $event) {
+        if ($event instanceof TextDeltaEvent) {
+            $text .= $event->delta;
+        }
+    }
+
+    // Two non-null content chunks: "Hi" and "!"
+    expect($text)->toBe('Hi!');
+});
+
+it('streams cleanly when final-chunk usage fields are all explicit null', function () {
+    $streamBody = file_get_contents(__DIR__.'/Fixtures/stream-null-usage-tokens-response.txt');
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response($streamBody, 200, [
+            'Content-Type' => 'text/event-stream',
+        ]),
+    ]);
+
+    $stream = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.6')
+        ->withPrompt('hi')
+        ->asStream();
+
+    $text = '';
+    foreach ($stream as $event) {
+        if ($event instanceof TextDeltaEvent) {
+            $text .= $event->delta;
+        }
+    }
+
+    expect($text)->toBe('hi');
+});
+
 it('sends string content and stream flag in stream requests', function () {
     $streamBody = file_get_contents(__DIR__.'/Fixtures/stream-response.txt');
 

@@ -62,3 +62,49 @@ it('sends requests to the configured base url', function () {
         return str_contains($request->url(), 'gateway.ai.cloudflare.com/v1/test/gateway/compat/chat/completions');
     });
 });
+
+it('composes the chat/completions path correctly with a trailing slash on the base url', function () {
+    config()->set(
+        'prism.providers.workers-ai.url',
+        'https://gateway.ai.cloudflare.com/v1/test/gateway/compat/',
+    );
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('text-response.json'),
+        ),
+    ]);
+
+    Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->withPrompt('Hello!')
+        ->asText();
+
+    Http::assertSent(function ($request) {
+        // Must not produce a double slash or lose the /compat/ segment
+        return str_contains($request->url(), '/compat/chat/completions')
+            && ! str_contains($request->url(), '//chat');
+    });
+});
+
+it('composes the chat/completions path correctly with no trailing slash on the base url', function () {
+    config()->set(
+        'prism.providers.workers-ai.url',
+        'https://gateway.ai.cloudflare.com/v1/test/gateway/compat',
+    );
+
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('text-response.json'),
+        ),
+    ]);
+
+    Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->withPrompt('Hello!')
+        ->asText();
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/compat/chat/completions');
+    });
+});

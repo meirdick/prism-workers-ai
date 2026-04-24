@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         php: ['8.2', '8.3', '8.4']
 
@@ -29,4 +30,39 @@ jobs:
         run: composer install --no-interaction --prefer-dist
 
       - name: Run tests
+        run: vendor/bin/pest
+
+  laravel-ai-v06-compat:
+    # Smoke-test against laravel/ai ^0.6, which removed `PrismGateway`.
+    # Confirms the service provider boots without fatal errors, Prism-side
+    # registration (including the `workersai` alias) stays intact, and
+    # `agent()` degrades gracefully with a Log::warning instead of crashing.
+    # Drop this job once prism-workers-ai v0.5.0 ships with a native gateway
+    # and full v0.6 agent() support is restored.
+    runs-on: ubuntu-latest
+    name: laravel/ai ^0.6 compat (graceful degradation)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Require laravel/ai ^0.6 (and a testbench for Laravel 12+)
+        # laravel/ai v0.6 needs Laravel 12+ (illuminate/filesystem ^12|^13), so
+        # the default orchestra/testbench ^9 (Laravel 11) won't resolve. Bump it
+        # for this job only.
+        run: composer require --dev --no-interaction --no-update 'laravel/ai:^0.6.3' 'orchestra/testbench:^10.0'
+
+      - name: Install dependencies
+        run: composer update --no-interaction --prefer-dist --with-all-dependencies
+
+      - name: Assert PrismGateway is absent (confirms we're on v0.6+)
+        run: |
+          php -r 'require "vendor/autoload.php"; exit(class_exists("Laravel\\Ai\\Gateway\\Prism\\PrismGateway") ? 1 : 0);'
+
+      - name: Run full test suite (bridge tests auto-skip, degradation tests exercise)
         run: vendor/bin/pest

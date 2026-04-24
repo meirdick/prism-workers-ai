@@ -1,0 +1,6 @@
+data: {"id":"chatcmpl-usage-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-usage-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":null,"completion_tokens":null,"total_tokens":null}}
+
+data: [DONE]
+

@@ -1,0 +1,12 @@
+data: {"id":"chatcmpl-kimi-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":null},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-kimi-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{"content":"Hi","tool_calls":null},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-kimi-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{"content":null,"tool_calls":null},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-kimi-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{"content":"!","tool_calls":null},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-kimi-null","object":"chat.completion.chunk","created":1700000000,"model":"@cf/moonshotai/kimi-k2.6","choices":[{"index":0,"delta":{"tool_calls":null},"finish_reason":"stop"}],"usage":null}
+
+data: [DONE]
+

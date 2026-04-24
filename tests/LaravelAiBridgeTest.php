@@ -26,10 +26,11 @@ it('registers workers-ai driver with AiManager when laravel/ai is installed', fu
     if (! class_exists(\Laravel\Ai\AiManager::class)) {
         $this->markTestSkipped('laravel/ai is not installed');
     }
+    if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
+        $this->markTestSkipped('laravel/ai v0.6+ removed PrismGateway — Laravel AI bridge is disabled until prism-workers-ai v0.5.0');
+    }
 
-    $manager = app(\Laravel\Ai\AiManager::class);
-
-    // Configure the ai provider
+    // Configure the ai provider before resolving AiManager
     config()->set('ai.providers.workers-ai', [
         'driver' => 'workers-ai',
         'key' => 'test-key',
@@ -37,7 +38,39 @@ it('registers workers-ai driver with AiManager when laravel/ai is installed', fu
         'name' => 'workers-ai',
     ]);
 
+    $manager = app(\Laravel\Ai\AiManager::class);
+
     $provider = $manager->instance('workers-ai');
+
+    expect($provider)->toBeInstanceOf(\PrismWorkersAi\LaravelAi\WorkersAiProvider::class);
+});
+
+it('registers dashless "workersai" alias with PrismManager', function () {
+    $manager = app(PrismManager::class);
+
+    $provider = $manager->resolve('workersai');
+
+    expect($provider)->toBeInstanceOf(WorkersAi::class);
+});
+
+it('registers dashless "workersai" alias with AiManager when laravel/ai is installed', function () {
+    if (! class_exists(\Laravel\Ai\AiManager::class)) {
+        $this->markTestSkipped('laravel/ai is not installed');
+    }
+    if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
+        $this->markTestSkipped('laravel/ai v0.6+ removed PrismGateway — Laravel AI bridge is disabled until prism-workers-ai v0.5.0');
+    }
+
+    config()->set('ai.providers.workersai', [
+        'driver' => 'workersai',
+        'key' => 'test-key',
+        'url' => 'https://example.com/compat',
+        'name' => 'workersai',
+    ]);
+
+    $manager = app(\Laravel\Ai\AiManager::class);
+
+    $provider = $manager->instance('workersai');
 
     expect($provider)->toBeInstanceOf(\PrismWorkersAi\LaravelAi\WorkersAiProvider::class);
 });

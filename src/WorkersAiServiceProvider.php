@@ -22,14 +22,29 @@ class WorkersAiServiceProvider extends ServiceProvider
      * Register the workers-ai provider with Prism's PrismManager.
      *
      * This enables: Prism::text()->using('workers-ai', $model)->asText()
+     * Also registered under the dashless alias "workersai".
      */
     protected function registerWithPrism(): void
     {
         $this->app->extend(PrismManager::class, function (PrismManager $manager) {
-            $manager->extend(WorkersAi::KEY, fn ($app, array $config): WorkersAi => new WorkersAi(
-                apiKey: $config['api_key'] ?? $config['key'] ?? '',
-                url: $config['url'] ?? '',
-            ));
+            $creator = function ($app, array $config): WorkersAi {
+                // Alias resolution: fall back to the primary `workers-ai` config
+                // block when the alias block is missing `url`, so users don't
+                // duplicate config. Caller-provided values win on key collision.
+                if (empty($config['url'])) {
+                    $primary = $app['config']->get('prism.providers.'.WorkersAi::KEY, []);
+                    $config = array_merge($primary, $config);
+                }
+
+                return new WorkersAi(
+                    apiKey: $config['api_key'] ?? $config['key'] ?? '',
+                    url: $config['url'] ?? '',
+                    retryEnabled: (bool) ($config['retry'] ?? true),
+                );
+            };
+
+            $manager->extend(WorkersAi::KEY, $creator);
+            $manager->extend(WorkersAi::KEY_ALIAS, $creator);
 
             return $manager;
         });
@@ -39,6 +54,7 @@ class WorkersAiServiceProvider extends ServiceProvider
      * Register the workers-ai driver with Laravel AI SDK's AiManager.
      *
      * This enables: agent()->prompt('Hello', provider: 'workers-ai')
+     * Also registered under the dashless alias "workersai".
      *
      * When laravel/ai natively supports custom Prism providers (i.e.
      * toPrismProvider() returns string|PrismProvider), we skip the
@@ -54,10 +70,12 @@ class WorkersAiServiceProvider extends ServiceProvider
 
         if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
             Log::warning(
-                'meirdick/prism-workers-ai: PrismGateway has been removed from laravel/ai. '
-                . 'The workers-ai Laravel AI integration is disabled until a direct gateway is available. '
-                . 'Prism standalone (Prism::text()->using("workers-ai", ...)) still works. '
-                . 'Update meirdick/prism-workers-ai for a compatible version.'
+                'meirdick/prism-workers-ai: laravel/ai v0.6+ removed PrismGateway. '
+                . 'The agent()->prompt(provider: "workers-ai") integration is disabled in this release. '
+                . 'Prism standalone (Prism::text()->using("workers-ai", ...)) continues to work. '
+                . 'prism-workers-ai v0.5.0 (upcoming) will ship a native Laravel AI gateway — '
+                . 'pin to v0.5.0+ when it lands, or stay on laravel/ai v0.5 to keep agent() working today. '
+                . 'See https://github.com/meirdick/prism-workers-ai/blob/main/UPGRADING.md'
             );
 
             return;
@@ -66,7 +84,7 @@ class WorkersAiServiceProvider extends ServiceProvider
         $useOverride = $this->needsGatewayOverride();
 
         $this->app->afterResolving(\Laravel\Ai\AiManager::class, function ($manager) use ($useOverride) {
-            $manager->extend(WorkersAi::KEY, function ($app, array $config) use ($useOverride) {
+            $creator = function ($app, array $config) use ($useOverride) {
                 $gateway = $useOverride
                     ? new LaravelAi\WorkersAiGateway($app['events'])
                     : new \Laravel\Ai\Gateway\Prism\PrismGateway($app['events']);
@@ -76,7 +94,10 @@ class WorkersAiServiceProvider extends ServiceProvider
                     $config,
                     $app->make(\Illuminate\Contracts\Events\Dispatcher::class),
                 );
-            });
+            };
+
+            $manager->extend(WorkersAi::KEY, $creator);
+            $manager->extend(WorkersAi::KEY_ALIAS, $creator);
         });
     }
 

@@ -37,21 +37,25 @@ use PrismWorkersAi\Concerns\AppliesSessionAffinity;
 use PrismWorkersAi\Concerns\ExtractsThinking;
 use PrismWorkersAi\Concerns\ForwardsProviderOptions;
 use PrismWorkersAi\Concerns\MapsFinishReason;
+use PrismWorkersAi\Concerns\MapsUsage;
 use PrismWorkersAi\Concerns\ValidatesResponses;
 use PrismWorkersAi\Maps\FinishReasonMap;
 use PrismWorkersAi\Maps\MessageMap;
 use PrismWorkersAi\Maps\ToolChoiceMap;
 use PrismWorkersAi\Maps\ToolMap;
+use PrismWorkersAi\WorkersAi;
 use Throwable;
 
 class Stream
 {
-    use AppliesSessionAffinity, CallsTools, ExtractsThinking, ForwardsProviderOptions, MapsFinishReason, ValidatesResponses;
+    use AppliesSessionAffinity, CallsTools, ExtractsThinking, ForwardsProviderOptions, MapsFinishReason, MapsUsage, ValidatesResponses;
 
     protected StreamState $state;
 
-    public function __construct(protected PendingRequest $client)
-    {
+    public function __construct(
+        protected WorkersAi $provider,
+        protected PendingRequest $client
+    ) {
         $this->state = new StreamState;
     }
 
@@ -98,8 +102,8 @@ class Stream
                 yield new StreamStartEvent(
                     id: EventID::generate(),
                     timestamp: time(),
-                    model: data_get($data, 'model', $request->model()),
-                    provider: 'workers-ai'
+                    model: data_get($data, 'model', $this->provider->normalizeModel($request->model())),
+                    provider: WorkersAi::KEY
                 );
             }
 
@@ -289,7 +293,7 @@ class Stream
      */
     protected function extractToolCalls(array $data, array $toolCalls): array
     {
-        $deltaToolCalls = data_get($data, 'choices.0.delta.tool_calls', []);
+        $deltaToolCalls = data_get($data, 'choices.0.delta.tool_calls') ?? [];
 
         foreach ($deltaToolCalls as $deltaToolCall) {
             $index = data_get($deltaToolCall, 'index', 0);
@@ -302,14 +306,15 @@ class Stream
                 ];
             }
 
-            if ($id = data_get($deltaToolCall, 'id')) {
+            if (($id = data_get($deltaToolCall, 'id')) !== null) {
                 $toolCalls[$index]['id'] = $id;
             }
 
-            if ($name = data_get($deltaToolCall, 'function.name')) {
+            if (($name = data_get($deltaToolCall, 'function.name')) !== null) {
                 $toolCalls[$index]['name'] = $name;
             }
 
+            // `!== null` (not truthy): argument deltas can legitimately be "0" or ""
             if (($arguments = data_get($deltaToolCall, 'function.arguments')) !== null) {
                 $toolCalls[$index]['arguments'] .= $arguments;
             }
@@ -323,7 +328,7 @@ class Stream
      */
     protected function extractContent(array $data): string
     {
-        return data_get($data, 'choices.0.delta.content', '');
+        return data_get($data, 'choices.0.delta.content') ?? '';
     }
 
     /**
@@ -347,15 +352,7 @@ class Stream
     {
         $usage = data_get($data, 'usage');
 
-        if ($usage === null) {
-            return null;
-        }
-
-        return new Usage(
-            promptTokens: data_get($usage, 'prompt_tokens', 0),
-            completionTokens: data_get($usage, 'completion_tokens', 0),
-            thoughtTokens: data_get($usage, 'reasoning_tokens'),
-        );
+        return $usage === null ? null : $this->mapUsage($usage);
     }
 
     /**
@@ -428,7 +425,7 @@ class Stream
             ->post(
                 'chat/completions',
                 array_merge([
-                    'model' => $request->model(),
+                    'model' => $this->provider->normalizeModel($request->model()),
                     'messages' => (new MessageMap($request->messages(), $request->systemPrompts()))(),
                     'stream' => true,
                     'max_tokens' => $request->maxTokens() ?? 2048,

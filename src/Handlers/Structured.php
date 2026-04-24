@@ -13,11 +13,11 @@ use Prism\Prism\Structured\ResponseBuilder;
 use Prism\Prism\Structured\Step;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 use Prism\Prism\ValueObjects\Meta;
-use Prism\Prism\ValueObjects\Usage;
 use PrismWorkersAi\Concerns\AppliesSessionAffinity;
 use PrismWorkersAi\Concerns\ExtractsThinking;
 use PrismWorkersAi\Concerns\ForwardsProviderOptions;
 use PrismWorkersAi\Concerns\MapsFinishReason;
+use PrismWorkersAi\Concerns\MapsUsage;
 use PrismWorkersAi\Concerns\ValidatesResponses;
 use PrismWorkersAi\Maps\MessageMap;
 
@@ -27,12 +27,15 @@ class Structured
     use ExtractsThinking;
     use ForwardsProviderOptions;
     use MapsFinishReason;
+    use MapsUsage;
     use ValidatesResponses;
 
     protected ResponseBuilder $responseBuilder;
 
-    public function __construct(protected PendingRequest $client)
-    {
+    public function __construct(
+        protected \PrismWorkersAi\WorkersAi $provider,
+        protected PendingRequest $client
+    ) {
         $this->responseBuilder = new ResponseBuilder;
     }
 
@@ -81,13 +84,10 @@ class Structured
         $this->responseBuilder->addStep(new Step(
             text: $content,
             finishReason: $this->mapFinishReason($data),
-            usage: new Usage(
-                promptTokens: data_get($data, 'usage.prompt_tokens', 0),
-                completionTokens: data_get($data, 'usage.completion_tokens', 0),
-            ),
+            usage: $this->mapUsage(data_get($data, 'usage') ?? []),
             meta: new Meta(
-                id: data_get($data, 'id', ''),
-                model: data_get($data, 'model', ''),
+                id: data_get($data, 'id') ?? '',
+                model: data_get($data, 'model') ?? '',
             ),
             messages: $request->messages(),
             systemPrompts: $request->systemPrompts(),
@@ -107,7 +107,7 @@ class Structured
         $response = $this->client->post(
             'chat/completions',
             array_merge([
-                'model' => $request->model(),
+                'model' => $this->provider->normalizeModel($request->model()),
                 'messages' => (new MessageMap($request->messages(), $request->systemPrompts()))(),
                 'max_tokens' => $request->maxTokens() ?? 2048,
                 'response_format' => $responseFormat,

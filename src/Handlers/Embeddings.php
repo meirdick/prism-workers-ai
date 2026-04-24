@@ -17,7 +17,10 @@ class Embeddings
 {
     use ValidatesResponses;
 
-    public function __construct(protected PendingRequest $client) {}
+    public function __construct(
+        protected \PrismWorkersAi\WorkersAi $provider,
+        protected PendingRequest $client
+    ) {}
 
     public function handle(Request $request): EmbeddingsResponse
     {
@@ -32,10 +35,10 @@ class Embeddings
                 fn (array $item): Embedding => Embedding::fromArray($item['embedding']),
                 data_get($data, 'data', [])
             ),
-            usage: new EmbeddingsUsage(data_get($data, 'usage.total_tokens', 0)),
+            usage: new EmbeddingsUsage(data_get($data, 'usage.total_tokens') ?? 0),
             meta: new Meta(
                 id: '',
-                model: data_get($data, 'model', ''),
+                model: data_get($data, 'model') ?? '',
             ),
             raw: $data,
         );
@@ -47,7 +50,7 @@ class Embeddings
         $response = $this->client->post(
             'embeddings',
             [
-                'model' => $request->model(),
+                'model' => $this->provider->normalizeModel($request->model()),
                 'input' => $request->inputs(),
             ]
         );

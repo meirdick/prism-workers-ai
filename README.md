@@ -137,6 +137,9 @@ $response = Prism::text()
     ->withMaxTokens(2000)
     ->withPrompt('Follow-up question...')
     ->asText();
+
+// Prefix cache metrics are available in usage when the API returns them
+$response->usage->cacheReadInputTokens; // cached prompt tokens (null if no cache hit)
 ```
 
 ### With Laravel AI SDK
@@ -167,14 +170,55 @@ class MyAgent implements Agent, Conversational { ... }
 |-------|----------|
 | `workers-ai/@cf/moonshotai/kimi-k2.5` | Frontier — smartest (256K context, reasoning, vision, tool calling) |
 | `workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast` | General purpose (best quality/speed) |
+| `workers-ai/@cf/qwen/qwen3-30b-a3b-fp8` | Efficient MoE (30B total / 3B active, 32K context) |
+| `workers-ai/@cf/zai-org/glm-4.7-flash` | Long document summarization (131K context) |
 | `workers-ai/@cf/meta/llama-3.1-8b-instruct` | Fast/cheap tasks |
 | `workers-ai/@cf/qwen/qwq-32b` | Reasoning |
 | `workers-ai/@cf/qwen/qwen2.5-coder-32b-instruct` | Code generation |
 | `workers-ai/@cf/baai/bge-large-en-v1.5` | Embeddings (1024 dimensions) |
+| `workers-ai/@cf/qwen/qwen3-embedding-0.6b` | Embeddings (1024 dimensions, 4096 input tokens) |
+| `workers-ai/@cf/google/embeddinggemma-300m` | Embeddings (768 dimensions, low-latency) |
+
+> **Embedding dimensions:** Most embedding models output 1024 dimensions. If using `embeddinggemma-300m` (768 dims), set `models.embeddings.dimensions` to `768` in your `config/ai.php` provider config.
 
 > **Reasoning models:** Kimi K2.5 is a thinking model — it reasons before answering. Set `withMaxTokens(2000)` or higher, as reasoning tokens count against the limit. The thinking chain is available in `$response->steps[0]->additionalContent['thinking']`.
 
 All model names must be prefixed with `workers-ai/` when routing through AI Gateway, so the gateway knows which provider to route to.
+
+## Known quirks of the `/compat` endpoint
+
+Cloudflare's OpenAI-compatibility layer has one notable deviation from the OpenAI
+spec that this package handles internally, but is worth knowing about if you're
+writing your own handlers against the same endpoint:
+
+- **Explicit nulls instead of absent fields.** Some models (e.g. Kimi K2.6) emit
+  `"tool_calls": null` and `"prompt_tokens": null` rather than omitting the keys
+  when they have no value. Laravel's `data_get($data, 'key', $default)` only
+  returns `$default` when the key is **missing** — it happily returns explicit
+  `null`. Always coalesce with `?? $default` downstream of `data_get` when feeding
+  a typed sink.
+
+- **Network resets.** Long-running requests through the gateway occasionally die
+  with cURL 56 / connection reset. This package retries 3× on transient errors by
+  default (ConnectionException + HTTP 502/503/504). Override per-request via
+  `withClientRetry(...)` on the Prism request, or disable globally by adding
+  `'retry' => false` under `providers.workers-ai` in `config/prism.php`.
+
+## Compatibility
+
+| Dependency | Supported | Notes |
+|------------|-----------|-------|
+| `prism-php/prism` | `^0.99 \|\| ^0.100` | Full Prism support — `Prism::text()/structured()/embeddings()/stream()` all work on every supported version. |
+| `laravel/ai` `^0.3 – ^0.5` | ✅ Full support | `agent()->prompt(provider: 'workers-ai')` works via the `PrismGateway` subclass. |
+| `laravel/ai` `^0.6` | ⚠️ Prism-only | Upstream removed `PrismGateway`. The Laravel AI bridge auto-disables with a one-time `Log::warning`; Prism standalone keeps working. `agent()->prompt(provider: 'workers-ai')` will throw until v0.5.0 ships. |
+
+### The v0.6 gap and v0.5.0 plan
+
+`laravel/ai` v0.6 removed the `PrismGateway` class this package extended, so the `agent()` integration degrades on that line. If you need `agent()->prompt()` today, stay on `laravel/ai ^0.5` — this package on v0.4.x keeps it working there.
+
+**prism-workers-ai v0.5.0** (upcoming) will restore full `agent()` support on `laravel/ai ^0.6+` by shipping a native Laravel AI gateway, based on the design in [laravel/ai#405](https://github.com/laravel/ai/pull/405). The constructor of `PrismWorkersAi\LaravelAi\WorkersAiProvider` will change in that release — a minor BC break that only affects the small subset of users subclassing it directly.
+
+See [UPGRADING.md](UPGRADING.md) for the migration path as it firms up.
 
 ## How it works
 

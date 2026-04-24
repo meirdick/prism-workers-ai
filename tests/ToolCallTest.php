@@ -67,6 +67,33 @@ it('sends tool definitions in request payload', function () {
     });
 });
 
+it('sends empty properties as object (not array) for parameter-less tools', function () {
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('text-response.json'),
+        ),
+    ]);
+
+    $tool = (new Tool)
+        ->as('no_args_tool')
+        ->for('A tool with no parameters')
+        ->using(fn () => 'done');
+
+    Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+        ->withTools([$tool])
+        ->withPrompt('Test')
+        ->asText();
+
+    Http::assertSent(function ($request) {
+        $body = json_decode($request->body());
+        $properties = $body->tools[0]->function->parameters->properties ?? null;
+
+        // Workers AI JSON Schema validator rejects [] for properties (expects object)
+        return is_object($properties);
+    });
+});
+
 it('sends assistant content as string in tool call follow-up', function () {
     Http::fake([
         'gateway.ai.cloudflare.com/*' => Http::sequence([
