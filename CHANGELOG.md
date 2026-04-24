@@ -15,7 +15,11 @@
 - **Null usage token fields crash** — Same `data_get` anti-pattern: `"prompt_tokens": null` in responses flowed into `new Usage(int $promptTokens, ...)` causing TypeError. All token int fields (`prompt_tokens`, `completion_tokens`, `total_tokens`) now coalesce explicit nulls to `0` in Text, Structured, Stream, and Embeddings handlers.
 - **Empty tool `properties` array rejected by Workers AI** — Tools with zero parameters (e.g. `GetChildrenInfoTool` with `schema()` returning `[]`) produced `"properties": []` in the request payload. Workers AI's JSON Schema validator requires `properties` to be an `object` type, rejecting the empty array with "Tool X function has invalid 'parameters' schema". Fixed by coercing empty `properties` to an empty JSON object `{}`, mirroring Prism's OpenRouter provider pattern.
 - **Error messages swallowed on Cloudflare AI Gateway errors** — When the gateway returns errors in an `{ errors: [{ message: "...", code: N }] }` envelope (instead of the OpenAI-style `{ error: { message: "..." } }`), the real error message was lost and users only saw "WorkersAI Error [400]: Unknown error". The error extractor now handles both shapes plus string errors and top-level messages.
-- **Streamed tool-call argument chunks dropped when payload is `"0"` or `""`** — `Stream::extractToolCalls()` used a truthy check (`if ($arguments = data_get(...))`) that skipped falsy deltas. A tool argument like `{"count":0}` streamed as `{"count":` + `0` + `}` would lose the `0` chunk, producing malformed JSON on the accumulator. Switched `id`, `name`, and `arguments` delta accumulation to `!== null` so every valid-but-falsy chunk is kept. Reported in [#2](https://github.com/meirdick/prism-workers-ai/pull/2) by @danwall.
+- **Streamed tool-call argument chunks dropped when payload is `"0"` or `""`** — `Stream::extractToolCalls()` used a truthy check (`if ($arguments = data_get(...))`) that skipped falsy deltas. A tool argument like `{"count":0}` streamed as `{"count":` + `0` + `}` would lose the `0` chunk, producing malformed JSON on the accumulator. Fix by [@danwall](https://github.com/danwall) in [#2](https://github.com/meirdick/prism-workers-ai/pull/2) (`arguments` delta); extended to `id` and `name` deltas for consistency.
+
+### Contributors
+
+- [@danwall](https://github.com/danwall) — first external contribution ([#2](https://github.com/meirdick/prism-workers-ai/pull/2)). Thanks, Dan!
 
 ### Changes
 
