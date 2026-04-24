@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 use Prism\Prism\PrismServiceProvider;
 use PrismWorkersAi\WorkersAiServiceProvider;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Fail loudly if any test accidentally hits a real HTTP endpoint —
+        // every request must go through Http::fake().
+        Http::preventStrayRequests();
+    }
+
     protected function getPackageProviders($app): array
     {
         $providers = [

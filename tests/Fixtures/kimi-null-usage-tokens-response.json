@@ -1,0 +1,22 @@
+{
+    "id": "chatcmpl-kimi-002",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "@cf/moonshotai/kimi-k2.6",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "ok",
+                "tool_calls": null
+            },
+            "finish_reason": "stop"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+    }
+}

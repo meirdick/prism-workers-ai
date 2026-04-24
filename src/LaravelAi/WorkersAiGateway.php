@@ -32,9 +32,11 @@ class WorkersAiGateway extends PrismGateway
      */
     protected function configure($prism, Provider $provider, string $model): mixed
     {
-        if ($provider->driver() === WorkersAi::KEY) {
+        $driver = $provider->driver();
+
+        if ($driver === WorkersAi::KEY || $driver === WorkersAi::KEY_ALIAS) {
             return $prism->using(
-                WorkersAi::KEY,
+                $driver,
                 $model,
                 array_filter([
                     ...$provider->additionalConfiguration(),

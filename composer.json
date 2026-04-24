@@ -8,7 +8,7 @@
         "prism-php/prism": "^0.99 || ^0.100"
     },
     "suggest": {
-        "laravel/ai": "Required for agent() integration (^0.3 || ^0.4 || ^0.5)"
+        "laravel/ai": "Required for agent() integration (^0.3 || ^0.4 || ^0.5 || ^0.6). On ^0.6 the Laravel AI bridge is disabled (PrismGateway was removed upstream) — Prism::text()->using('workers-ai', ...) continues to work. Full agent() support returns in prism-workers-ai v0.5.0."
     },
     "require-dev": {
         "orchestra/testbench": "^9.0",

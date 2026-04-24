@@ -7,6 +7,7 @@ namespace PrismWorkersAi\Maps;
 use Prism\Prism\Contracts\ProviderMediaMapper;
 use Prism\Prism\Enums\Provider;
 use Prism\Prism\ValueObjects\Media\Image;
+use PrismWorkersAi\WorkersAi;
 
 /**
  * @property Image $media
@@ -30,7 +31,7 @@ class ImageMapper extends ProviderMediaMapper
 
     protected function provider(): string|Provider
     {
-        return 'workers-ai';
+        return WorkersAi::KEY;
     }
 
     protected function validateMedia(): bool

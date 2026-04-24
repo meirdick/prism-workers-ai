@@ -28,33 +28,62 @@ class WorkersAi extends Provider
 
     const KEY = 'workers-ai';
 
+    /**
+     * Dashless alias for KEY. Every other provider in the Laravel AI ecosystem
+     * (openai, anthropic, xai, gemini, groq, mistral, deepseek) is a single
+     * lowercase token, so users naturally reach for "workersai" — especially
+     * inside defensive try/catch blocks that would swallow "driver not
+     * supported" errors and silently degrade a feature.
+     */
+    const KEY_ALIAS = 'workersai';
+
+    /**
+     * Ensure the model string includes the workers-ai/ prefix required by
+     * the Cloudflare AI Gateway /compat endpoint.
+     */
+    public function normalizeModel(string $model): string
+    {
+        if ($this->modelPrefix !== '' && ! str_starts_with($model, $this->modelPrefix)) {
+            return $this->modelPrefix.$model;
+        }
+
+        return $model;
+    }
+
     public function __construct(
         #[\SensitiveParameter] public readonly string $apiKey,
         public readonly string $url,
-    ) {}
+        public readonly bool $retryEnabled = true,
+        public string $modelPrefix = '',
+    ) {
+        if ($this->modelPrefix === '') {
+            // Auto-detect prefix based on endpoint: /compat needs workers-ai/
+            $this->modelPrefix = str_ends_with($this->url, '/compat') ? self::KEY.'/' : '';
+        }
+    }
 
     #[\Override]
     public function text(TextRequest $request): TextResponse
     {
-        return (new Text($this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
+        return (new Text($this, $this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
     }
 
     #[\Override]
     public function stream(TextRequest $request): Generator
     {
-        return (new Stream($this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
+        return (new Stream($this, $this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
     }
 
     #[\Override]
     public function structured(StructuredRequest $request): StructuredResponse
     {
-        return (new Structured($this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
+        return (new Structured($this, $this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
     }
 
     #[\Override]
     public function embeddings(EmbeddingsRequest $request): EmbeddingsResponse
     {
-        return (new Embeddings($this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
+        return (new Embeddings($this, $this->client($request->clientOptions(), $request->clientRetry())))->handle($request);
     }
 
     #[\Override]
@@ -85,10 +114,39 @@ class WorkersAi extends Provider
      */
     protected function client(array $options = [], array $retry = []): PendingRequest
     {
+        $effectiveRetry = $retry !== [] ? $retry : ($this->retryEnabled ? self::defaultRetry() : null);
+
         return $this->baseClient()
             ->when($this->apiKey, fn ($client) => $client->withToken($this->apiKey))
             ->withOptions($options)
-            ->when($retry !== [], fn ($client) => $client->retry(...$retry))
+            ->when($effectiveRetry !== null, fn ($client) => $client->retry(...$effectiveRetry))
             ->baseUrl($this->url);
+    }
+
+    /**
+     * Retries transient network/gateway errors (cURL 6/7/28/56, HTTP 502/503/504).
+     * Users can override by passing their own config via `withClientRetry(...)` on
+     * the Prism request.
+     *
+     * @return array<mixed>
+     */
+    protected static function defaultRetry(): array
+    {
+        return [
+            3,
+            500,
+            function (\Throwable $exception): bool {
+                if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
+                    return true;
+                }
+
+                if ($exception instanceof RequestException) {
+                    return in_array($exception->response->getStatusCode(), [502, 503, 504], true);
+                }
+
+                return false;
+            },
+            true,
+        ];
     }
 }

@@ -19,11 +19,11 @@ use Prism\Prism\ValueObjects\Messages\ToolResultMessage;
 use Prism\Prism\ValueObjects\Meta;
 use Prism\Prism\ValueObjects\ToolCall;
 use Prism\Prism\ValueObjects\ToolResult;
-use Prism\Prism\ValueObjects\Usage;
 use PrismWorkersAi\Concerns\AppliesSessionAffinity;
 use PrismWorkersAi\Concerns\ExtractsThinking;
 use PrismWorkersAi\Concerns\ForwardsProviderOptions;
 use PrismWorkersAi\Concerns\MapsFinishReason;
+use PrismWorkersAi\Concerns\MapsUsage;
 use PrismWorkersAi\Concerns\ValidatesResponses;
 use PrismWorkersAi\Maps\MessageMap;
 use PrismWorkersAi\Maps\ToolChoiceMap;
@@ -36,12 +36,15 @@ class Text
     use ExtractsThinking;
     use ForwardsProviderOptions;
     use MapsFinishReason;
+    use MapsUsage;
     use ValidatesResponses;
 
     protected ResponseBuilder $responseBuilder;
 
-    public function __construct(protected PendingRequest $client)
-    {
+    public function __construct(
+        protected \PrismWorkersAi\WorkersAi $provider,
+        protected PendingRequest $client
+    ) {
         $this->responseBuilder = new ResponseBuilder;
     }
 
@@ -66,7 +69,7 @@ class Text
      */
     protected function handleToolCalls(array $data, Request $request): TextResponse
     {
-        $toolCalls = $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls', []));
+        $toolCalls = $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls') ?? []);
 
         if ($toolCalls === []) {
             throw new PrismException('Workers AI: finish reason is tool_calls but no tool calls found in response');
@@ -110,7 +113,7 @@ class Text
         $this->applySessionAffinity($request);
 
         $payload = array_merge([
-            'model' => $request->model(),
+            'model' => $this->provider->normalizeModel($request->model()),
             'messages' => (new MessageMap($request->messages(), $request->systemPrompts()))(),
             'max_tokens' => $request->maxTokens() ?? 2048,
         ], Arr::whereNotNull([
@@ -160,15 +163,10 @@ class Text
             toolCalls: $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls') ?? []),
             toolResults: $toolResults,
             providerToolCalls: [],
-            usage: new Usage(
-                data_get($data, 'usage.prompt_tokens', 0),
-                data_get($data, 'usage.completion_tokens', 0),
-                cacheReadInputTokens: data_get($data, 'usage.prompt_tokens_details.cached_tokens'),
-                thoughtTokens: data_get($data, 'usage.reasoning_tokens'),
-            ),
+            usage: $this->mapUsage(data_get($data, 'usage') ?? []),
             meta: new Meta(
-                id: data_get($data, 'id', ''),
-                model: data_get($data, 'model', ''),
+                id: data_get($data, 'id') ?? '',
+                model: data_get($data, 'model') ?? '',
             ),
             messages: $request->messages(),
             systemPrompts: $request->systemPrompts(),

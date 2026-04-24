@@ -185,6 +185,41 @@ class MyAgent implements Agent, Conversational { ... }
 
 All model names must be prefixed with `workers-ai/` when routing through AI Gateway, so the gateway knows which provider to route to.
 
+## Known quirks of the `/compat` endpoint
+
+Cloudflare's OpenAI-compatibility layer has one notable deviation from the OpenAI
+spec that this package handles internally, but is worth knowing about if you're
+writing your own handlers against the same endpoint:
+
+- **Explicit nulls instead of absent fields.** Some models (e.g. Kimi K2.6) emit
+  `"tool_calls": null` and `"prompt_tokens": null` rather than omitting the keys
+  when they have no value. Laravel's `data_get($data, 'key', $default)` only
+  returns `$default` when the key is **missing** — it happily returns explicit
+  `null`. Always coalesce with `?? $default` downstream of `data_get` when feeding
+  a typed sink.
+
+- **Network resets.** Long-running requests through the gateway occasionally die
+  with cURL 56 / connection reset. This package retries 3× on transient errors by
+  default (ConnectionException + HTTP 502/503/504). Override per-request via
+  `withClientRetry(...)` on the Prism request, or disable globally by adding
+  `'retry' => false` under `providers.workers-ai` in `config/prism.php`.
+
+## Compatibility
+
+| Dependency | Supported | Notes |
+|------------|-----------|-------|
+| `prism-php/prism` | `^0.99 \|\| ^0.100` | Full Prism support — `Prism::text()/structured()/embeddings()/stream()` all work on every supported version. |
+| `laravel/ai` `^0.3 – ^0.5` | ✅ Full support | `agent()->prompt(provider: 'workers-ai')` works via the `PrismGateway` subclass. |
+| `laravel/ai` `^0.6` | ⚠️ Prism-only | Upstream removed `PrismGateway`. The Laravel AI bridge auto-disables with a one-time `Log::warning`; Prism standalone keeps working. `agent()->prompt(provider: 'workers-ai')` will throw until v0.5.0 ships. |
+
+### The v0.6 gap and v0.5.0 plan
+
+`laravel/ai` v0.6 removed the `PrismGateway` class this package extended, so the `agent()` integration degrades on that line. If you need `agent()->prompt()` today, stay on `laravel/ai ^0.5` — this package on v0.4.x keeps it working there.
+
+**prism-workers-ai v0.5.0** (upcoming) will restore full `agent()` support on `laravel/ai ^0.6+` by shipping a native Laravel AI gateway, based on the design in [laravel/ai#405](https://github.com/laravel/ai/pull/405). The constructor of `PrismWorkersAi\LaravelAi\WorkersAiProvider` will change in that release — a minor BC break that only affects the small subset of users subclassing it directly.
+
+See [UPGRADING.md](UPGRADING.md) for the migration path as it firms up.
+
 ## How it works
 
 The package registers a `workers-ai` provider at two levels:

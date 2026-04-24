@@ -60,3 +60,36 @@ it('handles object content in responses without crashing', function () {
     // Should not crash — content gets JSON encoded
     expect($response->text)->toContain('greeting');
 });
+
+it('handles explicit null tool_calls from Kimi K2.6 /compat', function () {
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('kimi-null-tool-calls-response.json'),
+        ),
+    ]);
+
+    $response = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.6')
+        ->withPrompt('Hello')
+        ->asText();
+
+    expect($response->text)->toBe('Here is your reply.');
+    expect($response->finishReason)->toBe(FinishReason::Stop);
+    expect($response->steps->first()->toolCalls)->toBe([]);
+});
+
+it('handles explicit null usage token fields without crashing', function () {
+    Http::fake([
+        'gateway.ai.cloudflare.com/*' => Http::response(
+            $this->fixture('kimi-null-usage-tokens-response.json'),
+        ),
+    ]);
+
+    $response = Prism::text()
+        ->using('workers-ai', 'workers-ai/@cf/moonshotai/kimi-k2.6')
+        ->withPrompt('Hello')
+        ->asText();
+
+    expect($response->usage->promptTokens)->toBe(0);
+    expect($response->usage->completionTokens)->toBe(0);
+});

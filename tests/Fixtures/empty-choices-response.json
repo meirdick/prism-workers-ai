@@ -1,0 +1,12 @@
+{
+    "id": "chatcmpl-empty",
+    "object": "chat.completion",
+    "created": 1700000000,
+    "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "choices": [],
+    "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 0,
+        "total_tokens": 10
+    }
+}
