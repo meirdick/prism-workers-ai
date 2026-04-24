@@ -17,6 +17,7 @@ use Prism\Prism\Structured\Request as StructuredRequest;
 use Prism\Prism\Structured\Response as StructuredResponse;
 use Prism\Prism\Text\Request as TextRequest;
 use Prism\Prism\Text\Response as TextResponse;
+use PrismWorkersAi\Concerns\ExtractsErrorMessage;
 use PrismWorkersAi\Handlers\Embeddings;
 use PrismWorkersAi\Handlers\Stream;
 use PrismWorkersAi\Handlers\Structured;
@@ -24,7 +25,7 @@ use PrismWorkersAi\Handlers\Text;
 
 class WorkersAi extends Provider
 {
-    use InitializesClient;
+    use ExtractsErrorMessage, InitializesClient;
 
     const KEY = 'workers-ai';
 
@@ -103,7 +104,7 @@ class WorkersAi extends Provider
             provider: 'WorkersAI',
             statusCode: $e->response->getStatusCode(),
             errorType: data_get($data, 'error.type'),
-            errorMessage: data_get($data, 'error.message'),
+            errorMessage: $this->extractErrorMessage($data),
             previous: $e
         );
     }

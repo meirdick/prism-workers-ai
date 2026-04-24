@@ -306,14 +306,15 @@ class Stream
                 ];
             }
 
-            if ($id = data_get($deltaToolCall, 'id')) {
+            if (($id = data_get($deltaToolCall, 'id')) !== null) {
                 $toolCalls[$index]['id'] = $id;
             }
 
-            if ($name = data_get($deltaToolCall, 'function.name')) {
+            if (($name = data_get($deltaToolCall, 'function.name')) !== null) {
                 $toolCalls[$index]['name'] = $name;
             }
 
+            // `!== null` (not truthy): argument deltas can legitimately be "0" or ""
             if (($arguments = data_get($deltaToolCall, 'function.arguments')) !== null) {
                 $toolCalls[$index]['arguments'] .= $arguments;
             }
