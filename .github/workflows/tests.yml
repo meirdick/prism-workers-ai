@@ -51,8 +51,11 @@ jobs:
           php-version: '8.3'
           coverage: none
 
-      - name: Require laravel/ai ^0.6
-        run: composer require --dev --no-interaction --no-update 'laravel/ai:^0.6.3'
+      - name: Require laravel/ai ^0.6 (and a testbench for Laravel 12+)
+        # laravel/ai v0.6 needs Laravel 12+ (illuminate/filesystem ^12|^13), so
+        # the default orchestra/testbench ^9 (Laravel 11) won't resolve. Bump it
+        # for this job only.
+        run: composer require --dev --no-interaction --no-update 'laravel/ai:^0.6.3' 'orchestra/testbench:^10.0'
 
       - name: Install dependencies
         run: composer update --no-interaction --prefer-dist --with-all-dependencies

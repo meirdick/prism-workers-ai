@@ -45,6 +45,9 @@ it('keeps Prism provider registration intact on laravel/ai v0.6+', function () {
 });
 
 it('logs a graceful-degradation warning on laravel/ai v0.6+ boot', function () {
+    if (! class_exists(\Laravel\Ai\AiManager::class)) {
+        $this->markTestSkipped('laravel/ai not installed — warning only fires when AiManager is present but PrismGateway is absent');
+    }
     if (class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
         $this->markTestSkipped('PrismGateway still present — not v0.6+');
     }
