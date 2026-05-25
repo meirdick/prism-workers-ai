@@ -39,6 +39,12 @@ test('workersai sends max_completion_tokens when set via attributes', function (
 });
 
 test('workersai sends top_p when set via #[TopP] attribute', function () {
+    // #[TopP] attribute and TextGenerationOptions::$topP were added in
+    // laravel/ai v0.6.6 (#306). Earlier versions silently no-op.
+    if (! class_exists(\Laravel\Ai\Attributes\TopP::class)) {
+        $this->markTestSkipped('#[TopP] attribute requires laravel/ai ^0.6.6 or newer');
+    }
+
     Http::fake(['api.cloudflare.com/*' => Http::response(workersAiTextResponse())]);
 
     (new \Tests\Fixtures\Agents\TopPAgent)->prompt('Hello', provider: 'workersai');

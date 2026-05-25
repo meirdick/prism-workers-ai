@@ -87,6 +87,12 @@ test('embeddings validates model name on compat endpoint', function () {
 })->throws(\Laravel\Ai\Exceptions\AiException::class, 'is missing the `workers-ai/` prefix');
 
 test('embeddings forward caller providerOptions into the request body', function () {
+    // PendingEmbeddingsGeneration::providerOptions() was added in laravel/ai
+    // v0.6.8 (#555) along with the new EmbeddingGateway signature.
+    if (! method_exists(\Laravel\Ai\PendingResponses\PendingEmbeddingsGeneration::class, 'providerOptions')) {
+        $this->markTestSkipped('Embeddings providerOptions requires laravel/ai ^0.6.8 or newer');
+    }
+
     Http::fake(['api.cloudflare.com/*' => fakeWorkersAiEmbeddingsResponse()]);
 
     Embeddings::for(['Hello world'])
@@ -104,6 +110,10 @@ test('embeddings forward caller providerOptions into the request body', function
 });
 
 test('embeddings reject reserved providerOptions keys (model, input)', function () {
+    if (! method_exists(\Laravel\Ai\PendingResponses\PendingEmbeddingsGeneration::class, 'providerOptions')) {
+        $this->markTestSkipped('Embeddings providerOptions requires laravel/ai ^0.6.8 or newer');
+    }
+
     Http::fake(['api.cloudflare.com/*' => fakeWorkersAiEmbeddingsResponse()]);
 
     Embeddings::for(['Hello'])

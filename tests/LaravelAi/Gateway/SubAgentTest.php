@@ -18,6 +18,13 @@ use function Laravel\Ai\agent;
  */
 
 beforeEach(function () {
+    // CanActAsTool + AgentTool wrapping was added in laravel/ai v0.6.8 (#348).
+    // Skip the whole file on older versions — the fixture itself can't load
+    // because it implements an interface that doesn't exist.
+    if (! interface_exists(\Laravel\Ai\Contracts\CanActAsTool::class)) {
+        $this->markTestSkipped('CanActAsTool sub-agent contract requires laravel/ai ^0.6.8 or newer');
+    }
+
     config(['ai.providers.workersai' => [
         ...config('ai.providers.workersai'),
         'key' => 'test-key',

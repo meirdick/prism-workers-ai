@@ -121,8 +121,32 @@ jobs:
       - name: Run tests
         run: vendor/bin/pest
 
-  # laravel/ai ^0.5 backstop intentionally dropped: the orchestra/testbench
-  # ^9 + pestphp/pest ^3 + laravel/framework ^12 combination doesn't resolve
-  # via composer (incompatible phpunit transitives), so the matrix entry was
-  # noise that never represented a real user workflow. ^0.5 callers should
-  # pin meirdick/prism-workers-ai ^0.4 — see README compatibility table.
+  laravel-ai-v05-compat:
+    # Backward-compat against laravel/ai ^0.5.x — the last line that still
+    # ships PrismGateway. Our native gateway uses only stable contracts so
+    # v0.5.x stays working; v0.7-only primitives (Strict, TopP, embeddings
+    # providerOptions) silently no-op via the Cloudflare/*Compat shims.
+    #
+    # Note: laravel/ai ^0.5.1 requires illuminate/* ^12|^13 (Laravel 12+),
+    # same as ^0.7. The testbench pin must be ^10, NOT ^9 — earlier ^9 pin
+    # was wrong and unresolvable.
+    runs-on: ubuntu-latest
+    name: laravel/ai ^0.5 compat
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Pin laravel/ai to ^0.5 (testbench stays at ^10 — Laravel 12+)
+        run: composer require --dev --no-interaction --no-update 'laravel/ai:^0.5.1' 'orchestra/testbench:^10.0'
+
+      - name: Install dependencies
+        run: composer update --no-interaction --prefer-dist --with-all-dependencies
+
+      - name: Run tests
+        run: vendor/bin/pest

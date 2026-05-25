@@ -281,7 +281,7 @@ All errors fire on the first request through the misconfigured provider — ther
 | `prism-php/prism` | `^0.99 \|\| ^0.100` | Full support on the Prism path — `Prism::text() / structured() / embeddings() / stream()` all work. |
 | `laravel/ai` `^0.7` | ✅ Recommended | Native gateway with v0.7 catchup: `ToolNameResolver`, `#[Strict]` opt-in, `#[TopP]`, `providerOptions` forwarded in embeddings, `reasoning_content` replay across tool-call turns. |
 | `laravel/ai` `^0.6` | ✅ Supported | Native gateway works the same; v0.7-only primitives (Strict, TopP, providerOptions-on-embeddings) silently no-op on this line. |
-| `laravel/ai` `^0.5` | ⚠️ Best-effort | Stable contracts the native gateway uses (`TextGateway`, `EmbeddingGateway`) exist on this line, so the gateway should work. Not CI-tested because the `orchestra/testbench ^9` + `pestphp/pest ^3` + `laravel/framework ^12` combination doesn't resolve. Users on ^0.5 should pin `meirdick/prism-workers-ai ^0.4`. |
+| `laravel/ai` `^0.5` | ✅ Supported | Same native gateway, stable contracts. v0.7-only primitives silently no-op via compat shims. CI-tested with `orchestra/testbench ^10` (laravel/ai ^0.5 needs Laravel 12+, same as ^0.7). |
 | `laravel/ai` `^0.3 \|\| ^0.4` | ⚠️ Best-effort | Older interfaces; pin `prism-workers-ai ^0.4` if you need this line. |
 
 ## How it works

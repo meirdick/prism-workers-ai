@@ -17,6 +17,7 @@ use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\Data\Usage;
 use Laravel\Ai\Responses\StructuredTextResponse;
 use Laravel\Ai\Responses\TextResponse;
+use PrismWorkersAi\Cloudflare\AssistantMessageFactory;
 use PrismWorkersAi\Cloudflare\ErrorEnvelope;
 use PrismWorkersAi\Cloudflare\ToolCallList;
 use PrismWorkersAi\Cloudflare\UsageTokens;
@@ -135,12 +136,16 @@ trait ParsesTextResponses
         // QwQ on Workers AI; DeepSeek upstream) lose multi-turn coherence if the
         // thinking that led to the first tool call isn't replayed on the next
         // request. Pattern matches laravel/ai's DeepSeek native gateway.
+        // AssistantMessageFactory handles the v0.5 ↔ v0.6+ constructor diff:
+        // older laravel/ai accepts only (content, toolCalls); the factory
+        // drops the providerContentBlocks arg there and reasoning replay
+        // silently no-ops (the feature is v0.6+ anyway).
         $providerContentBlocks = [];
         if (filled($message['reasoning_content'] ?? null)) {
             $providerContentBlocks['reasoning_content'] = $message['reasoning_content'];
         }
 
-        $assistantMessage = new AssistantMessage($text, collect($mappedToolCalls), $providerContentBlocks);
+        $assistantMessage = AssistantMessageFactory::make($text, collect($mappedToolCalls), $providerContentBlocks);
 
         $messages->push($assistantMessage);
 

@@ -110,6 +110,14 @@ test('streaming handles tool calls', function () {
 });
 
 test('streaming replays reasoning_content into the tool-call follow-up request', function () {
+    // AssistantMessage::$providerContentBlocks was added in laravel/ai
+    // v0.6.6/v0.6.7. On older versions our AssistantMessageFactory drops
+    // the third arg silently and reasoning replay can't round-trip.
+    $ctor = (new ReflectionClass(\Laravel\Ai\Messages\AssistantMessage::class))->getConstructor();
+    if ($ctor->getNumberOfParameters() < 3) {
+        $this->markTestSkipped('reasoning_content replay requires AssistantMessage->providerContentBlocks (laravel/ai ^0.6.6+)');
+    }
+
     // First streamed turn: reasoning deltas, then a tool call.
     // Second turn (follow-up): assert the assistant message in the chat history
     // carries reasoning_content so the model keeps its chain of thought.
@@ -157,6 +165,11 @@ test('streaming replays reasoning_content into the tool-call follow-up request',
 });
 
 test('non-streaming replays reasoning_content into the tool-call follow-up request', function () {
+    $ctor = (new ReflectionClass(\Laravel\Ai\Messages\AssistantMessage::class))->getConstructor();
+    if ($ctor->getNumberOfParameters() < 3) {
+        $this->markTestSkipped('reasoning_content replay requires AssistantMessage->providerContentBlocks (laravel/ai ^0.6.6+)');
+    }
+
     Http::fake([
         'api.cloudflare.com/*' => Http::sequence([
             Http::response([
