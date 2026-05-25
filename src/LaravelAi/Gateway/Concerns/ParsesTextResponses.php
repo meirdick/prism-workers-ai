@@ -270,41 +270,16 @@ trait ParsesTextResponses
             };
         }
 
-        $body = [
-            'model' => $model,
-            'messages' => $chatMessages,
-        ];
-
-        if (filled($tools)) {
-            $mappedTools = $this->mapTools($tools);
-
-            if (filled($mappedTools)) {
-                $body['tool_choice'] = 'auto';
-                $body['tools'] = $mappedTools;
-            }
-        }
-
-        if (filled($schema)) {
-            $body['response_format'] = $this->buildResponseFormat(
-                $schema,
-                \PrismWorkersAi\Cloudflare\StrictAttributeGuard::isAppliedTo($options?->agent),
-            );
-        }
-
-        if (! is_null($options?->maxTokens)) {
-            $body['max_completion_tokens'] = $options->maxTokens;
-        }
-
-        $body = array_merge($body, \Illuminate\Support\Arr::whereNotNull([
-            'temperature' => $options?->temperature,
-            'top_p' => \PrismWorkersAi\Cloudflare\TextOptionsCompat::topP($options),
-        ]));
-
-        $providerOptions = $options?->providerOptions($provider->driver());
-
-        if (filled($providerOptions)) {
-            $body = array_merge($body, $providerOptions);
-        }
+        // finalizeChatBody (in BuildsTextRequests) appends tools, response_format,
+        // sampling options, and providerOptions to the body. Same helper the
+        // initial-turn buildTextRequestBody uses — single source of truth.
+        $body = $this->finalizeChatBody(
+            ['model' => $model, 'messages' => $chatMessages],
+            provider: $provider,
+            tools: $tools,
+            schema: $schema,
+            options: $options,
+        );
 
         $response = $this->withErrorHandling(
             $provider->name(),

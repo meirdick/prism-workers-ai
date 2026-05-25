@@ -3,7 +3,6 @@
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Exceptions\AiException;
-use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 
 use function Laravel\Ai\agent;
@@ -48,26 +47,10 @@ test('workersai throws rate limited exception on 429', function () {
     agent()->prompt('Hello', provider: 'workersai');
 })->throws(RateLimitedException::class);
 
-test('workersai throws InsufficientCreditsException on 402 (auto-wired by HandlesFailoverErrors)', function () {
-    // The auto-402 conversion to InsufficientCreditsException landed in
-    // laravel/ai's HandlesFailoverErrors trait in ^0.7. On older lines the
-    // trait still has the exception class but only invokes it from the
-    // pattern-matching path, not from a bare 402 status. Detect the new
-    // branch by looking for the literal status check.
-    $reflection = new ReflectionMethod(
-        \Laravel\Ai\Gateway\Concerns\HandlesFailoverErrors::class,
-        'withErrorHandling'
-    );
-    $source = file_get_contents($reflection->getFileName());
-    if (! str_contains($source, '$status === 402')) {
-        $this->markTestSkipped('HandlesFailoverErrors does not auto-convert 402 on this laravel/ai version');
-    }
-
-    Http::fake([
-        'api.cloudflare.com/*' => Http::response([
-            'error' => ['type' => 'insufficient_quota', 'message' => 'Quota exceeded'],
-        ], 402),
-    ]);
-
-    agent()->prompt('Hello', provider: 'workersai');
-})->throws(InsufficientCreditsException::class);
+// The 402 → InsufficientCreditsException conversion is provided upstream by
+// `HandlesFailoverErrors::withErrorHandling` (laravel/ai v0.7). Testing it
+// here would just be testing upstream's behavior, not ours — and the previous
+// version inspected the trait's source file to decide when to skip, which
+// would silently rot if upstream restructured the trait. Re-add when Cloudflare
+// gives us a fixture showing the real quota error shape so we can map message
+// patterns to InsufficientCreditsException ourselves via insufficientCreditPatterns().

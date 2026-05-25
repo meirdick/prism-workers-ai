@@ -339,43 +339,23 @@ trait HandlesTextStreaming
                 ...$updatedPriorMessages,
             ];
 
-            $body = [
-                'model' => $model,
-                'messages' => $chatMessages,
-                'stream' => true,
-                'stream_options' => ['include_usage' => true],
-            ];
-
-            if (filled($tools)) {
-                $mappedTools = $this->mapTools($tools);
-
-                if (filled($mappedTools)) {
-                    $body['tool_choice'] = 'auto';
-                    $body['tools'] = $mappedTools;
-                }
-            }
-
-            if (filled($schema)) {
-                $body['response_format'] = $this->buildResponseFormat(
-                    $schema,
-                    \PrismWorkersAi\Cloudflare\StrictAttributeGuard::isAppliedTo($options?->agent),
-                );
-            }
-
-            if (! is_null($options?->maxTokens)) {
-                $body['max_completion_tokens'] = $options->maxTokens;
-            }
-
-            $body = array_merge($body, \Illuminate\Support\Arr::whereNotNull([
-                'temperature' => $options?->temperature,
-                'top_p' => \PrismWorkersAi\Cloudflare\TextOptionsCompat::topP($options),
-            ]));
-
-            $providerOptions = $options?->providerOptions($provider->driver());
-
-            if (filled($providerOptions)) {
-                $body = array_merge($body, $providerOptions);
-            }
+            // finalizeChatBody (in BuildsTextRequests) appends tools,
+            // response_format, sampling options, and providerOptions. Same
+            // helper the initial-turn and non-streaming follow-up paths use —
+            // single source of truth across the three sites that build chat
+            // request bodies.
+            $body = $this->finalizeChatBody(
+                [
+                    'model' => $model,
+                    'messages' => $chatMessages,
+                    'stream' => true,
+                    'stream_options' => ['include_usage' => true],
+                ],
+                provider: $provider,
+                tools: $tools,
+                schema: $schema,
+                options: $options,
+            );
 
             $response = $this->withErrorHandling(
                 $provider->name(),

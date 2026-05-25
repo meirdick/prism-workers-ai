@@ -254,9 +254,15 @@ writing your own handlers against the same endpoint:
 
 `laravel/ai` v0.7's `#[Strict]` attribute opts an agent into OpenAI's strict-JSON-schema mode. Our gateway honors the attribute and threads it into both `ObjectSchema(strict: ...)` (tighter schema generation) and the response_format `strict` flag.
 
-Live testing against Workers AI's `/compat` endpoint (direct API + AI Gateway routes) shows the schema constraints are enforced in both directions — `strict: true` and `strict: false` produce structurally identical responses against the same schema, and unknown properties don't leak through either way. Workers AI returns structured `content` as a JSON object (not a string); the gateway re-serializes it transparently.
+**Behavior by `laravel/ai` version:**
 
-The flag is sent honestly per user intent, but Workers AI's documentation doesn't make explicit guarantees about how `strict` interacts with their `/compat` layer. Treat the attribute as a hint that future Workers AI models or modes may take advantage of, not a hard contract.
+| `laravel/ai` | Default | Opt-in mechanism |
+| --- | --- | --- |
+| `^0.7` | `strict: false` | Add `#[Strict]` to the agent (or tool) class |
+| `^0.6` | `strict: true` (preserved from v0.4.x) | None — the attribute doesn't exist on this line; pin `meirdick/prism-workers-ai ^0.4` if you need non-strict |
+| `^0.5` | `strict: true` (preserved from v0.4.x) | Same — pin `^0.4` for non-strict |
+
+Live testing against Workers AI's `/compat` endpoint (direct API + AI Gateway routes) shows the schema constraints are enforced in both directions — `strict: true` and `strict: false` produce structurally identical responses against the same schema, and unknown properties don't leak through either way. Workers AI returns structured `content` as a JSON object (not a string); the gateway re-serializes it transparently. The flag is sent honestly per user intent, but Workers AI's documentation doesn't make explicit guarantees about how `strict` interacts with their `/compat` layer.
 
 ## Configuration troubleshooting
 
@@ -276,13 +282,13 @@ All errors fire on the first request through the misconfigured provider — ther
 
 ## Compatibility
 
-| Dependency | Supported | Notes |
-|------------|-----------|-------|
-| `prism-php/prism` | `^0.99 \|\| ^0.100` | Full support on the Prism path — `Prism::text() / structured() / embeddings() / stream()` all work. |
-| `laravel/ai` `^0.7` | ✅ Recommended | Native gateway with v0.7 catchup: `ToolNameResolver`, `#[Strict]` opt-in, `#[TopP]`, `providerOptions` forwarded in embeddings, `reasoning_content` replay across tool-call turns. |
-| `laravel/ai` `^0.6` | ✅ Supported | Native gateway works the same; v0.7-only primitives (Strict, TopP, providerOptions-on-embeddings) silently no-op on this line. |
-| `laravel/ai` `^0.5` | ✅ Supported | Same native gateway, stable contracts. v0.7-only primitives silently no-op via compat shims. CI-tested with `orchestra/testbench ^10` (laravel/ai ^0.5 needs Laravel 12+, same as ^0.7). |
-| `laravel/ai` `^0.3 \|\| ^0.4` | ⚠️ Best-effort | Older interfaces; pin `prism-workers-ai ^0.4` if you need this line. |
+| Dependency | Status | Notes |
+|------------|--------|-------|
+| `prism-php/prism` `^0.99 \|\| ^0.100` | Optional (suggest) | Only needed for the Prism integration (`Prism::text()->using('workers-ai', ...)`). Laravel-AI-only consumers don't pay for it. |
+| `laravel/ai` `^0.7` | ✅ Recommended (dev pin) | Full v0.7 catchup: `ToolNameResolver`, `#[Strict]` opt-in, `#[TopP]`, `providerOptions` in embeddings, `reasoning_content` replay. CI-tested. |
+| `laravel/ai` `^0.6` | ✅ Supported | Native gateway works the same. `#[Strict]` doesn't exist here → we preserve the v0.4.x always-strict default. Other v0.7-only primitives silently no-op via compat shims. CI-tested. |
+| `laravel/ai` `^0.5` | ✅ Supported with skips | CI-tested. 9 v0.6+/v0.7+ feature tests self-skip on this line (`Embeddings::providerOptions`, `#[TopP]`, `CanActAsTool`, `AssistantMessage->providerContentBlocks`, `#[Strict]`). Core gateway functionality works; advanced features are graceful no-ops. |
+| `laravel/ai` `^0.3 \|\| ^0.4` | ⚠️ Best-effort | Pin `prism-workers-ai ^0.4`. The native gateway uses primitives those lines don't have. |
 
 ## How it works
 
@@ -292,6 +298,10 @@ Two independent integrations, neither of which depends on the other:
 2. **Laravel AI layer** — `PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway` implements `Laravel\Ai\Contracts\Gateway\TextGateway` + `EmbeddingGateway` directly. Owns its own HTTP client, message mapping, SSE streaming, multi-round tool call loop, structured output, and reasoning event emission. Registered via `AiManager::extend()`. Mirrors the native-gateway pattern used by every first-party `laravel/ai` provider.
 
 Both share `PrismWorkersAi\Cloudflare\*` for wire-shape concerns: error envelope extraction (OpenAI + Cloudflare AI Gateway shapes), explicit-null-tolerant token parsing, JSON Schema empty-properties coercion, retry policy, streamed tool-call delta accumulation. Workers AI quirks land in one place and propagate to both integrations.
+
+### Upstream coupling
+
+The Laravel AI gateway implements `Laravel\Ai\Contracts\Gateway\TextGateway` and `EmbeddingGateway` (public contracts), plus uses three traits from `Laravel\Ai\Gateway\Concerns\*` (`HandlesFailoverErrors`, `InvokesTools`, `ParsesServerSentEvents`). The traits aren't part of laravel/ai's *documented* public API but they've been stable in name and signature since `^0.5` — same as the contracts. Inlining them into our `Cloudflare/*` namespace would be a 244-line copy; leaning on them is the pragmatic call. If a future laravel/ai release renames or restructures them, the gateway breaks at autoload and we ship a patch.
 
 ## Automated Setup
 

@@ -45,11 +45,12 @@ class WorkersAiServiceProvider extends ServiceProvider
 
                 // BaseUrl handles all three shapes (url | account_id+gateway |
                 // account_id) with the same validation as the Laravel AI path.
-                // Empty config returns '' for backward compat with prior versions
-                // that allowed instantiation before any request.
-                $url = (! empty($config['url']) || ! empty($config['account_id']))
-                    ? BaseUrl::build($config)
-                    : '';
+                // Missing config throws here with the actionable error message
+                // built into BaseUrl — fail-fast, no silent empty-URL behavior.
+                // The creator closure only runs when Prism actually resolves
+                // the provider (i.e. at first use, not at boot), so this is
+                // safe under auto-discovery.
+                $url = BaseUrl::build($config);
 
                 return new WorkersAi(
                     apiKey: $config['api_key'] ?? $config['key'] ?? '',

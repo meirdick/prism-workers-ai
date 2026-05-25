@@ -32,11 +32,23 @@ class WorkersAi extends Provider
     /**
      * Driver-key constants — kept as aliases to {@see WorkersAiKey} for
      * backward compatibility with code that imported them off this class
-     * before v0.5.0. The canonical home is `PrismWorkersAi\WorkersAiKey`,
-     * which doesn't drag Prism's autoloader along when read.
+     * before v0.5.0.
+     *
+     * Reading either constant autoloads this class, which extends a
+     * Prism-backed parent — so referencing them transitively requires
+     * `prism-php/prism` to be installed. That defeats the no-Prism promise
+     * for Laravel-AI-only consumers. Migrate to
+     * `PrismWorkersAi\WorkersAiKey::PRIMARY` / `::ALIAS` for a Prism-free
+     * reference. These aliases will be removed in v1.0.
+     *
+     * @deprecated 0.5.0 Use {@see WorkersAiKey::PRIMARY} instead. Reading
+     *             this constant pulls in Prism via autoload.
      */
     public const KEY = WorkersAiKey::PRIMARY;
 
+    /**
+     * @deprecated 0.5.0 Use {@see WorkersAiKey::ALIAS} instead.
+     */
     public const KEY_ALIAS = WorkersAiKey::ALIAS;
 
     /**

@@ -40,7 +40,10 @@ final class AssistantMessageFactory
 
     /**
      * Cached reflection probe — re-checking on every call would dominate
-     * the cost of hot tool-call loops.
+     * the cost of hot tool-call loops. Cache is process-lifetime; tests that
+     * swap the installed laravel/ai version inside a single PHP process
+     * (e.g. matrix simulation without restarting) should call
+     * {@see self::resetCache()} between configurations.
      */
     private static ?bool $supports = null;
 
@@ -53,5 +56,17 @@ final class AssistantMessageFactory
         $ctor = (new ReflectionClass(AssistantMessage::class))->getConstructor();
 
         return self::$supports = $ctor !== null && $ctor->getNumberOfParameters() >= 3;
+    }
+
+    /**
+     * Reset the static probe cache. Intended for test harnesses that swap
+     * laravel/ai installations within a single PHP process. Production code
+     * should never need to call this.
+     *
+     * @internal
+     */
+    public static function resetCache(): void
+    {
+        self::$supports = null;
     }
 }

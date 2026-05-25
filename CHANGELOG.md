@@ -2,101 +2,99 @@
 
 ## v0.5.0 — 2026-05-25
 
+The headline: this release decouples the package from Prism. Laravel-AI-only consumers no longer pull in `prism-php/prism` and its ~150 transitive packages. The Prism integration is preserved and unchanged for users who want it.
+
+### Native Laravel AI gateway
+
+A native `WorkersAiGateway` for `agent()->prompt(provider: 'workers-ai')`, ported from the unmerged [laravel/ai#405](https://github.com/laravel/ai/pull/405) into our package. Replaces the old `PrismGateway` subclass shim that `laravel/ai v0.6.1` removed upstream.
+
+- HTTP, message mapping, streaming SSE parsing, multi-round tool loops, structured output, image attachments, embeddings — all owned by this package on the Laravel AI path.
+- Smart URL construction: `account_id` alone → direct Workers AI API; `account_id` + `gateway` → Cloudflare AI Gateway; explicit `url` → escape hatch (and the only path that hits the legacy `/compat` endpoint).
+- Reasoning events (`ReasoningStart` / `ReasoningDelta` / `ReasoningEnd`) for thinking models (Kimi K2.5, Gemma 4, QwQ).
+- Session affinity header forwarded for prefix-cache multi-turn caching.
+- Validation: pairing a `/compat` URL with a bare `@cf/...` model ID (or vice versa) now throws `AiException` with the fix in the message, instead of silently 404-ing from Cloudflare.
+
 ### `prism-php/prism` is now optional
 
-The package can run as a Laravel-AI-only integration. Composer no longer pulls in `prism-php/prism` and its ~150 transitive packages unless the consumer explicitly requires it.
+- Moved from `require` to `suggest`. Consumers who use `Prism::text()->using('workers-ai', ...)` need to add `"prism-php/prism": "^0.99 || ^0.100"` to their own `composer.json` (existing Prism users already have it).
+- New `PrismWorkersAi\WorkersAiKey` (Prism-free constants: `::PRIMARY`, `::ALIAS`). `WorkersAi::KEY` / `KEY_ALIAS` are kept as `@deprecated` BC aliases — reading them autoloads the Prism-backed class, defeating the no-Prism promise.
+- `WorkersAiServiceProvider::registerWithPrism()` gates on `class_exists(\Prism\Prism\PrismManager::class)`. Prism absent → that registration silently no-ops, Laravel AI bridge still wires up.
+- New `no-prism` CI job locks the promise: removes `prism-php/prism` from vendor, runs the Laravel AI testsuite.
 
-- `prism-php/prism` moved from `require` to `suggest` in `composer.json`. Consumers who use `Prism::text()->using('workers-ai', ...)` need to add `"prism-php/prism": "^0.99 || ^0.100"` to their own `composer.json` (existing Prism users already have it).
-- `PrismWorkersAi\WorkersAiKey` — new Prism-free constants class (`::PRIMARY = 'workers-ai'`, `::ALIAS = 'workersai'`). The `WorkersAi::KEY` / `WorkersAi::KEY_ALIAS` constants are kept as BC aliases that delegate to `WorkersAiKey` — but reading them still autoloads the Prism-backed `WorkersAi` class. Migrate to `WorkersAiKey::PRIMARY` / `::ALIAS` if you're running without Prism.
-- `WorkersAiServiceProvider::registerWithPrism()` now gates on `class_exists(\Prism\Prism\PrismManager::class)`. When Prism isn't installed, the Prism manager registration is skipped silently and the Laravel AI bridge still wires up normally.
-- New `no-prism` CI job that removes `prism-php/prism` from vendor and runs the Laravel AI test subset. Locks the "no Prism required" promise against regressions.
-- Live-verified in a fresh project with `laravel/ai ^0.7` + our package + zero Prism: `agent()->prompt()`, `Embeddings::for()->generate()`, and tool calling all round-trip to Cloudflare correctly.
+### `laravel/ai ^0.7` catchup
 
-### Compatibility with `laravel/ai` v0.7
+Each interface or idiomatic change upstream landed between `v0.6.3` and `v0.7.0` is reflected here:
 
-### Compatibility with `laravel/ai` v0.7
+- `EmbeddingGateway::generateEmbeddings` — added `array $providerOptions = []` (LSP-required for v0.7). Caller options merge into the Workers AI body; reserved keys (`model`, `input`) are stripped.
+- `ToolNameResolver::resolve($tool)` — replaces `class_basename($tool)` in `MapsTools`. Tools defining a `name()` method emit the dynamic name (MCP adapters, sub-agent `AgentTool` wrappers).
+- `$options->topP` — forwarded via `Arr::whereNotNull` in both streaming and non-streaming bodies when set via `#[TopP(0.9)]`.
+- `AssistantMessage->providerContentBlocks` (third constructor arg, v0.6.6/v0.6.7) — gateway captures `reasoning_content` into it and replays across tool-call turns so multi-turn reasoning models keep their chain of thought.
+- `#[Strict]` attribute — honored when present (v0.7+). Default behavior: see "BC breaks" below.
+- HTTP 402 → `InsufficientCreditsException` auto-wired via `HandlesFailoverErrors` on v0.7+.
 
-This release adds full compatibility with `laravel/ai ^0.7` while keeping `^0.5` and `^0.6` working. The interface and idiomatic changes shipped upstream between v0.6.3 and v0.7.0 are now reflected here:
+### Compatibility shims (`src/Cloudflare/*Compat`, `*Guard`)
 
-- **`EmbeddingGateway::generateEmbeddings` signature** — added `array $providerOptions = []` (laravel/ai v0.6.8 #555). Required for LSP compliance; calling code on v0.7 PHP-errors at autoload otherwise. We forward caller options into the Workers AI request body (with `model` and `input` reserved/stripped so the gateway stays in charge of the request shape).
-- **`ToolNameResolver::resolve($tool)`** — replaces `class_basename($tool)` in `MapsTools`. Tools that define a `name()` method now emit the dynamic name. Critical for MCP-style adapters and sub-agents (`CanActAsTool`) where multiple instances of one class would otherwise collide. Sub-agents wrapped via laravel/ai's `AgentTool` auto-surface their dynamic name through this path.
-- **`$options->topP`** — `TextGenerationOptions` gained a `topP` field in v0.6.6 (#306). Our gateway now forwards it via `Arr::whereNotNull` in both the streaming and non-streaming request bodies. Set on an agent with `#[TopP(0.9)]`.
-- **`AssistantMessage->providerContentBlocks`** — third constructor arg added upstream (v0.6.6/v0.6.7) so reasoning models can replay `reasoning_content` across tool-call turns. Our gateway captures `reasoning_content` on parse, stores it in `providerContentBlocks`, and replays it via `MapsMessages::mapAssistantMessage` and the streaming tool-call follow-up. Multi-turn conversations with Kimi K2.5 / Gemma 4 / QwQ keep their chain of thought across the tool boundary.
-- **`#[Strict]` attribute** — v0.7's new opt-in strict-JSON-schema attribute. Previously our gateway hardcoded `'strict' => true` in every structured request, which silently changed user schemas that weren't authored for strict mode (all-required-properties, no additionalProperties). The gateway now reads `Strict::isAppliedTo($options?->agent)` and threads it into both `ObjectSchema(strict: ...)` schema generation and the response_format `strict` flag. **Default behavior changed from always-strict to opt-in** — users who relied on auto-strict need to add `#[Strict]` to their agent (or tool).
+So the package works across `laravel/ai ^0.5 || ^0.6 || ^0.7`:
 
-### Internal cleanup, parity with native laravel/ai providers
-
-- `ParsesTextResponses::continueWithToolResults` now dispatches via `match (true)` to the existing `MapsMessages::mapAssistantMessage` / `mapToolResultMessage` helpers — single source of truth for assistant-message mapping across both the initial chat-history-build path and the tool-call follow-up.
-- `MapsMessages::mapAssistantMessage` enhanced to replay `reasoning_content` from `providerContentBlocks` when present (DeepSeek-style).
-- `HandlesTextStreaming::processTextStream` accumulates `$currentReasoning` from reasoning deltas and threads it into `handleStreamingToolCalls` so the streaming tool-call follow-up replays reasoning the same way the non-streaming path does.
-
-### Live-test discoveries (folded into this release)
-
-- **Empty `content` field on assistant tool-call messages** — Workers AI's `/compat` endpoint 400s with "oneOf at '/' not met" when an assistant message carries `tool_calls` without a `content` field. The OpenAI spec allows omitting content in that case; Workers AI does not. `MapsMessages::mapAssistantMessage` and `HandlesTextStreaming::handleStreamingToolCalls` now always emit `content` as the floor (empty string when the model didn't speak), matching the Prism-side handling we already had. Regression test in `tests/LaravelAi/Gateway/MessageMappingTest.php`.
-- **`TextOptionsCompat::topP()` shim** — older `laravel/ai` (^0.5, ^0.6) doesn't expose `topP` on `TextGenerationOptions`. Naive `$options?->topP` access triggers an "Undefined property" PHP warning on those versions. The shim uses `property_exists` so the gateway forwards `top_p` on v0.7+ and silently no-ops elsewhere.
-- **`ToolNameCompat::resolve()` shim** — `Laravel\Ai\Tools\ToolNameResolver` is v0.7-only. The shim falls back to the historical `class_basename`-or-`name()` behavior on older lines so the gateway doesn't fatal at autoload when a tool is mapped on ^0.5/^0.6.
-- **Strict mode against Workers AI** — `strict: true` and `strict: false` both yield identical schema enforcement against `/compat`; unknown properties are dropped either way. Documented in the README; the flag is sent honestly per user intent without claims about upstream guarantees.
-- **Cloudflare error envelope confirmed** — live probes confirm `/compat` uses the `{"errors": [{"code": N, "message": "..."}]}` shape on 400/401/etc. Our existing `ErrorEnvelope::extract()` already handles this.
-
-### Live verification
-
-- Paws TestWorkersAi command (`php artisan test:workers-ai --test=all`) — all 8 Prism subtests pass against live Cloudflare AI Gateway (text, structured, embeddings, tools, stream, reasoning, reasoning-stream, session-affinity). Prefix cache metric verified live: 17 cached tokens on a session-affinity second turn.
-- `agent()` end-to-end against live Cloudflare via paws's `0.x-dev` `laravel/ai` (a pre-v0.6.8 snapshot — exercises the compat shims): basic text, streaming, tool calling, embeddings all confirmed working.
-
-### Tests
-
-206 tests, 0 regressions, on `laravel/ai` v0.7.0 and v0.6.3. New cases: ToolMappingTest (dynamic name resolution, sub-agent CanActAsTool), RequestMappingTest (top_p forwarding), StructuredOutputTest (Strict opt-in), ErrorHandlingTest (HTTP 402 → InsufficientCreditsException), EmbeddingTest (providerOptions forwarding + reserved key rejection), StreamingTest + MessageMappingTest (reasoning_content round-trip in both streaming and non-streaming follow-ups).
-
-### Native Laravel AI gateway (replaces PrismGateway subclass)
-
-This release wires up a **native** `WorkersAiGateway` for the Laravel AI SDK integration, ported from the unmerged [laravel/ai#405](https://github.com/laravel/ai/pull/405). The old `PrismGateway` extension is gone — `agent()->prompt(provider: 'workers-ai')` no longer depends on `Laravel\Ai\Gateway\Prism\PrismGateway`, which `laravel/ai` v0.6.1 removed entirely. Tested against `laravel/ai ^0.5.1`, `^0.6.3`, and `^0.7.0`.
-
-## v0.5.0-internal — earlier work (folded into v0.5.0 above)
-
-### Native Laravel AI gateway (replaces PrismGateway subclass) — original
-
-The original v0.5.0 staging work wired up a native `WorkersAiGateway` for the Laravel AI SDK integration, ported from the unmerged [laravel/ai#405](https://github.com/laravel/ai/pull/405). The old `PrismGateway` extension is gone — `agent()->prompt(provider: 'workers-ai')` no longer depends on `Laravel\Ai\Gateway\Prism\PrismGateway`, which `laravel/ai` v0.6.1 removed entirely.
-
-Native gateway means:
-- HTTP, message mapping, streaming SSE parsing, multi-round tool-call loops, structured output, image attachments, and embeddings are all owned by this package on the Laravel AI path. No more delegation through Prism for `agent()` calls.
-- Smart URL construction — `account_id` alone targets Cloudflare's direct Workers AI endpoint (`api.cloudflare.com/.../ai/v1`); `account_id` + `gateway` targets the AI Gateway path (`gateway.ai.cloudflare.com/.../workers-ai/v1`); explicit `url` continues to work as an escape hatch and is the only way to hit the legacy `/compat` endpoint.
-- Reasoning event support — `ReasoningStart`, `ReasoningDelta`, `ReasoningEnd` for thinking models (Kimi K2.5, Gemma 4, QwQ).
-- Session affinity and prefix-cache metrics carried over from v0.4.6.
-- Validation — using a `/compat` URL with bare `@cf/...` model IDs now throws a helpful `AiException` pointing at the fix instead of returning a confusing upstream error.
-
-The Prism integration (`Prism::text()->using('workers-ai', ...)`) is unchanged.
+- `StrictAttributeGuard` — reads `Strict::isAppliedTo()` on v0.7+; on older lines preserves the v0.4.x always-strict default (the attribute doesn't exist there and users have no opt-in mechanism).
+- `TextOptionsCompat::topP()` — `property_exists` probe so reading `$options->topP` doesn't warn on lines that don't have the field.
+- `ToolNameCompat::resolve()` — falls back to historical `class_basename`/`name()` when `Laravel\Ai\Tools\ToolNameResolver` is missing.
+- `AssistantMessageFactory::make()` — reflects the constructor at runtime and drops the third arg on lines that don't accept it.
 
 ### Shared invariants in `PrismWorkersAi\Cloudflare\*`
 
-The wire-shape concerns — null-tolerant token coalescing, error envelope extraction (OpenAI + Cloudflare AI Gateway shapes), JSON Schema empty-properties coercion, streamed tool-call delta accumulation, retry policy — now live in a single namespace consumed by both the Prism path and the Laravel AI gateway. Future Workers AI quirks land in one file and propagate to both integrations.
+Wire-shape concerns the Prism path and Laravel AI gateway both consume:
 
-New classes: `ErrorEnvelope`, `UsageTokens`, `RetryPolicy`, `ToolSchema`, `ToolCallList`, `StreamToolCallAccumulator`.
+- `ErrorEnvelope` — extracts error message + code from both the OpenAI `{"error": {...}}` shape and the Cloudflare AI Gateway `{"errors": [...]}` shape.
+- `UsageTokens` — null-tolerant token parsing (Workers AI emits explicit-null fields on some models).
+- `BaseUrl` — single URL resolver for both paths; validates `account_id` / `gateway` formats and rejects ambiguous configs (both `url` and `account_id` set).
+- `ModelPrefix` — validates model-ID/endpoint pairing in both directions.
+- `RetryPolicy`, `ToolSchema`, `ToolCallList`, `StreamToolCallAccumulator`.
 
-### Configuration symmetry between Prism and Laravel AI paths
+### Bug fixes discovered via live verification
 
-The Prism path now accepts the same `account_id` (+ optional `gateway`) config shape as the Laravel AI gateway. Same env vars (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_GATEWAY`) work on both sides — no more `WORKERS_AI_URL` plumbing for users who just want the direct API or the AI Gateway provider path. Explicit `url` continues to work as the escape hatch (and remains the only way to hit the legacy `/compat` endpoint).
+- **Workers AI requires `content` on assistant tool-call messages.** The `/compat` endpoint 400s with "oneOf at '/' not met" when an assistant message has `tool_calls` but no `content` field. `MapsMessages::mapAssistantMessage` and `HandlesTextStreaming::handleStreamingToolCalls` now always emit `content` as the floor (empty string when the model didn't speak), matching the Prism-side handling. Regression-locked in `MessageMappingTest`.
 
-Underlying both paths is a new `PrismWorkersAi\Cloudflare\BaseUrl` resolver that validates `account_id` and `gateway` formats up front (rejects URLs pasted into slug fields, both `url`+`account_id` set simultaneously, etc.) and a `PrismWorkersAi\Cloudflare\ModelPrefix` validator that catches model-ID/endpoint mismatches in both directions — bare ID on `/compat`, or prefixed ID on `/v1`. Each error message includes the fix; see the new "Configuration troubleshooting" section in the README.
+### BC breaks
 
-### BC break
+- **`PrismWorkersAi\LaravelAi\WorkersAiProvider` constructor** changed from `(Gateway $gateway, array $config, Dispatcher $events)` to `(array $config, Dispatcher $events)`. Mirrors `XaiProvider`/`MistralProvider`. Affects subclassers only; `agent()` / config-driven users unaffected.
+- **`PrismWorkersAi\LaravelAi\WorkersAiGateway` was rewritten** and moved namespace to `PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway`. It now implements `TextGateway` + `EmbeddingGateway` directly instead of extending `Laravel\Ai\Gateway\Prism\PrismGateway`.
+- **`#[Strict]` default on `laravel/ai ^0.7`** flipped from always-strict (v0.4.x) to opt-in via the attribute. On `^0.5` / `^0.6` (no attribute available) the gateway preserves the v0.4.x always-strict default — users on those lines who need non-strict should pin `meirdick/prism-workers-ai ^0.4`.
+- **`prism-php/prism` no longer auto-installed.** Existing Prism users add `"prism-php/prism": "^0.99 || ^0.100"` to their `composer.json` (most already have it).
+- **Prism path now validates model-prefix/endpoint pairing.** `Prism::text()->using('workers-ai', 'workers-ai/@cf/...')` against a non-`/compat` URL throws `InvalidArgumentException` instead of silently 404-ing.
+- **Setting both `url` and `account_id` in config is now an error** (was previously: `url` won silently).
+- `WorkersAiServiceProvider::needsGatewayOverride()` removed (reflection probe no longer needed).
+- The graceful-degradation `Log::warning` on `laravel/ai ^0.6` boot removed (bridge works natively on v0.6+ now).
 
-- **`PrismWorkersAi\LaravelAi\WorkersAiProvider` constructor signature changed** from `(Gateway $gateway, array $config, Dispatcher $events)` to `(array $config, Dispatcher $events)`. Mirrors `XaiProvider`/`MistralProvider` in `laravel/ai`. Affects only users who subclass `WorkersAiProvider` directly. `agent()`-based usage and config-driven registration are unaffected.
-- **`PrismWorkersAi\LaravelAi\WorkersAiGateway` was rewritten.** The class still exists at `PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway` (note the new `Gateway\` segment); it now implements `TextGateway` + `EmbeddingGateway` directly instead of extending `Laravel\Ai\Gateway\Prism\PrismGateway`. If you were importing the class directly, update the namespace.
-- **Prism-side now validates model-prefix/endpoint pairing.** Previously `Prism::text()->using('workers-ai', 'workers-ai/@cf/...')` against a non-`/compat` URL would silently 404 from Cloudflare. It now throws `InvalidArgumentException` with the fix in the message. Anyone who was relying on the silent failure should either drop the prefix or switch their URL to `/compat`.
-- **Setting both `url` and `account_id` is now an error.** Previously `url` won silently. Pick one — see the troubleshooting section.
+### Compatibility matrix
 
-### Removed
+| Dependency | Support |
+| --- | --- |
+| `php` | `^8.2` |
+| `prism-php/prism` `^0.99 || ^0.100` | Optional (suggest). Required for `Prism::text()->using('workers-ai', ...)`. |
+| `laravel/ai` `^0.7` | ✅ Recommended (dev pin) |
+| `laravel/ai` `^0.6` | ✅ Supported (CI matrix) |
+| `laravel/ai` `^0.5` | ✅ Supported (CI matrix; 9 v0.6+/v0.7+ feature tests self-skip) |
+| `laravel/ai` `^0.3 \|\| ^0.4` | Best-effort; pin `meirdick/prism-workers-ai ^0.4` |
 
-- `WorkersAiServiceProvider::needsGatewayOverride()` — the reflection probe is no longer needed.
-- The graceful-degradation `Log::warning` on `laravel/ai ^0.6` boot — the bridge works on v0.6+ now, no degradation to warn about.
+### Live verification
+
+- **paws** (Prism path): `php artisan test:workers-ai --test=all` → 8/8 subtests pass against live Cloudflare AI Gateway. Prefix-cache metric verified live (17 cached tokens on session-affinity second turn).
+- **paws** (Prism removed + `laravel/ai v0.7.0`): `agent()->prompt`, `Embeddings::for`, tool calling, streaming all round-trip to `gateway.ai.cloudflare.com`. Prism absent from vendor confirmed.
+- **endo-baddie** (v0.5.0 swapped in): 5/5 live tests pass; `Embeddings::for()` matches the production `food:generate-embeddings` command's call shape.
+- **Fresh standalone project** (`laravel/ai ^0.7` + our package + zero Prism): `agent()->prompt()`, `Embeddings::for()->generate()`, tool calling all hit `api.cloudflare.com` successfully.
+
+### Upstream coupling note
+
+The Laravel AI gateway implements `Laravel\Ai\Contracts\Gateway\TextGateway` and `EmbeddingGateway` (public contracts), and uses three traits from `Laravel\Ai\Gateway\Concerns\*` (`HandlesFailoverErrors`, `InvokesTools`, `ParsesServerSentEvents`). The traits aren't documented as public API but have been stable in name and signature since `^0.5`. Inlining them into `Cloudflare/*` would be a 244-line copy. If a future laravel/ai release renames or restructures them, the gateway breaks at autoload and we ship a patch.
 
 ### Migration
 
-See [UPGRADING.md](UPGRADING.md). For the typical user (config-driven, `agent()`-based) there's nothing to do beyond `composer update`.
+See [UPGRADING.md](UPGRADING.md). For the typical user (config-driven, `agent()`-based, already requires Prism explicitly) there's nothing to do beyond `composer update`.
 
 ### Tests
 
-181 tests pass on `laravel/ai ^0.6.3`, full suite (no skipped). 45 of those are ported from PR #405 — five categories: AgentFake, BaseUrl, Embedding, ErrorHandling, MessageMapping, ProviderOptions, RequestMapping, Streaming, ToolCallLoop, ToolMapping.
+207 tests pass on `laravel/ai v0.7.0` (dev pin). CI matrix: default + Prism-only + no-Prism + `^0.6` + `^0.5`. All green.
 
 ## v0.4.6 — 2026-04-23
 

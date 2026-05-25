@@ -56,6 +56,13 @@ trait MapsAttachments
 
     /**
      * Determine if the given uploaded file is an image.
+     *
+     * Allowlist mirrors the MIME types Workers AI's vision models accept on
+     * `/compat`. Other image MIMEs (svg+xml, avif, heic, heif, ...) and the
+     * raster variants Cloudflare doesn't decode yet are intentionally
+     * rejected — silently passing them through would surface as an opaque
+     * 400 from the upstream. Expand this list when Cloudflare documents
+     * support for new MIMEs.
      */
     protected function isImage(UploadedFile $attachment): bool
     {

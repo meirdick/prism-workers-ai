@@ -12,7 +12,8 @@ use PrismWorkersAi\Cloudflare\TextOptionsCompat;
 trait BuildsTextRequests
 {
     /**
-     * Build the request body for the Chat Completions API.
+     * Build the request body for the Chat Completions API from
+     * `Laravel\Ai\Messages\Message[]` (initial-turn shape).
      */
     protected function buildTextRequestBody(
         Provider $provider,
@@ -23,11 +24,38 @@ trait BuildsTextRequests
         ?array $schema,
         ?TextGenerationOptions $options,
     ): array {
-        $body = [
-            'model' => $model,
-            'messages' => $this->mapMessagesToChat($messages, $instructions),
-        ];
+        return $this->finalizeChatBody(
+            [
+                'model' => $model,
+                'messages' => $this->mapMessagesToChat($messages, $instructions),
+            ],
+            provider: $provider,
+            tools: $tools,
+            schema: $schema,
+            options: $options,
+        );
+    }
 
+    /**
+     * Append tools, response_format, sampling options, and providerOptions to
+     * a body that already carries `model` and `messages`.
+     *
+     * Called from three places — `buildTextRequestBody` (initial turn) and the
+     * tool-call follow-up bodies in `ParsesTextResponses::continueWithToolResults`
+     * and `HandlesTextStreaming::handleStreamingToolCalls`. Previously each site
+     * rebuilt the same shape inline, which let new options drift between paths;
+     * threading them all through this helper is the single source of truth.
+     *
+     * @param  array<string, mixed>  $body  must already contain `model` + `messages`
+     * @return array<string, mixed>
+     */
+    protected function finalizeChatBody(
+        array $body,
+        Provider $provider,
+        array $tools,
+        ?array $schema,
+        ?TextGenerationOptions $options,
+    ): array {
         if (filled($tools)) {
             $mappedTools = $this->mapTools($tools);
 
@@ -38,9 +66,9 @@ trait BuildsTextRequests
         }
 
         if (filled($schema)) {
-            // StrictAttributeGuard returns false on laravel/ai ^0.5 || ^0.6 where
-            // the #[Strict] attribute doesn't exist yet. Strict mode is a
-            // v0.7-only opt-in; older lines never had it.
+            // StrictAttributeGuard returns true on laravel/ai ^0.5 / ^0.6
+            // (preserving v0.4.x always-strict behavior on lines without the
+            // attribute) and honors `#[Strict]` on v0.7+.
             $body['response_format'] = $this->buildResponseFormat(
                 $schema,
                 StrictAttributeGuard::isAppliedTo($options?->agent),
@@ -53,8 +81,8 @@ trait BuildsTextRequests
 
         // top_p was added to TextGenerationOptions in laravel/ai v0.6.6.
         // TextOptionsCompat::topP returns null on older lines so we don't trip
-        // an "Undefined property" warning. Arr::whereNotNull then keeps the
-        // body clean of null fields.
+        // an "Undefined property" warning. Arr::whereNotNull keeps the body
+        // clean of null fields.
         $body = array_merge($body, Arr::whereNotNull([
             'temperature' => $options?->temperature,
             'top_p' => TextOptionsCompat::topP($options),
