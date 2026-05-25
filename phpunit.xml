@@ -7,6 +7,28 @@
     <testsuites>
         <testsuite name="Tests">
             <directory>tests</directory>
+            <exclude>tests/Fixtures</exclude>
+            <exclude>tests/LaravelAi/Helpers.php</exclude>
+            <exclude>tests/LaravelAi/Gateway/WorkersAiHelpers.php</exclude>
+        </testsuite>
+
+        <!-- Prism-only suite. Use in CI via the testsuite flag when
+             laravel/ai is not installed. The Laravel AI test files
+             reference fixtures that use traits from laravel/ai;
+             autoloading those fixtures without the package fatals.
+             Excluding the LaravelAi directory keeps Prism tests clean. -->
+        <testsuite name="Prism">
+            <directory>tests</directory>
+            <exclude>tests/LaravelAi</exclude>
+            <exclude>tests/Fixtures</exclude>
+        </testsuite>
+
+        <!-- Laravel AI only suite. Use when prism-php/prism is not installed. -->
+        <testsuite name="LaravelAi">
+            <directory>tests/LaravelAi</directory>
+            <file>tests/LaravelAiBridgeTest.php</file>
+            <exclude>tests/LaravelAi/Helpers.php</exclude>
+            <exclude>tests/LaravelAi/Gateway/WorkersAiHelpers.php</exclude>
         </testsuite>
     </testsuites>
     <source>

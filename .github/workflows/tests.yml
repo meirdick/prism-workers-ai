@@ -57,8 +57,11 @@ jobs:
       - name: Install dependencies
         run: composer update --no-interaction --prefer-dist --with-all-dependencies
 
-      - name: Run tests (Laravel AI tests auto-skip)
-        run: vendor/bin/pest
+      - name: Run Prism-side tests only
+        # tests/LaravelAi/ fixtures use traits from laravel/ai; autoloading
+        # them when laravel/ai is absent fatals. Use the dedicated Prism
+        # testsuite which excludes that directory.
+        run: vendor/bin/pest --testsuite=Prism
 
   no-prism:
     # Validates the Laravel AI native gateway works with prism-php/prism
@@ -87,8 +90,11 @@ jobs:
         run: |
           test ! -d vendor/prism-php/prism || (echo "Prism still in vendor — failing"; exit 1)
 
-      - name: Run Laravel AI tests only (Prism-side tests skip themselves)
-        run: vendor/bin/pest tests/LaravelAi/ tests/LaravelAiBridgeTest.php
+      - name: Run Laravel AI tests only
+        # Use the dedicated testsuite which excludes Prism-side test files.
+        # tests/LaravelAiBridgeTest.php has self-skip guards for individual
+        # Prism-only cases.
+        run: vendor/bin/pest --testsuite=LaravelAi
 
   laravel-ai-v06-compat:
     # Backward-compat against laravel/ai ^0.6.x — the line we originally
