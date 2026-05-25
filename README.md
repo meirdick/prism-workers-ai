@@ -1,8 +1,8 @@
 # Prism Workers AI
 
-Cloudflare Workers AI provider for [Prism PHP](https://github.com/prism-php/prism) and [Laravel AI SDK](https://github.com/laravel/ai) — routes through the AI Gateway `/compat` endpoint.
+Cloudflare Workers AI provider for [Prism PHP](https://github.com/prism-php/prism) and the [Laravel AI SDK](https://github.com/laravel/ai). Targets the direct Workers AI API, the AI Gateway, or the legacy `/compat` endpoint — your config picks.
 
-Works with both `Prism::text()->using('workers-ai', ...)` and `agent()->prompt(provider: 'workers-ai')`.
+Works with both `Prism::text()->using('workers-ai', ...)` and `agent()->prompt(provider: 'workers-ai')`. The Laravel AI integration is a **native gateway** (no `prism-php/prism` dependency on the `agent()` path) — same pattern as `laravel/ai`'s built-in providers (`Anthropic`, `Xai`, `Mistral`, etc.).
 
 ## Why this package?
 
@@ -15,9 +15,29 @@ Workers AI's OpenAI-compatible `/compat` endpoint has subtle differences from th
 
 ## Installation
 
+### Laravel AI SDK only (recommended for new projects)
+
 ```bash
-composer require meirdick/prism-workers-ai
+composer require laravel/ai meirdick/prism-workers-ai
 ```
+
+`prism-php/prism` is **not** required — the native Laravel AI gateway runs against Cloudflare directly. Use `agent()->prompt(provider: 'workers-ai')`.
+
+### With Prism PHP
+
+```bash
+composer require prism-php/prism meirdick/prism-workers-ai
+```
+
+Use `Prism::text()->using('workers-ai', ...)` plus the agent integration if `laravel/ai` is also installed.
+
+### Both
+
+```bash
+composer require laravel/ai prism-php/prism meirdick/prism-workers-ai
+```
+
+Either entry point works; they're independent.
 
 The service provider is auto-discovered by Laravel. No additional setup needed.
 
@@ -25,23 +45,50 @@ The service provider is auto-discovered by Laravel. No additional setup needed.
 
 ### Prism PHP (`config/prism.php`)
 
+The Prism path supports the same three URL shapes as the Laravel AI gateway — pick one. Same env vars work for both.
+
 ```php
 'providers' => [
     'workers-ai' => [
         'api_key' => env('CLOUDFLARE_AI_API_TOKEN', ''),
-        'url' => env('WORKERS_AI_URL'),
+
+        // Option A — direct Workers AI API
+        'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+
+        // Option B — Cloudflare AI Gateway (uncomment to enable)
+        // 'gateway' => env('CLOUDFLARE_AI_GATEWAY'),
+
+        // Option C — explicit URL escape hatch (uncomment to use)
+        // 'url' => env('WORKERS_AI_URL'),
     ],
 ],
 ```
 
 ### Laravel AI SDK (`config/ai.php`)
 
+The native gateway supports three URL shapes — pick one. The recommended path is `account_id` (+ optional `gateway`), which lets you swap between direct API and AI Gateway with a single env var.
+
 ```php
 'providers' => [
     'workers-ai' => [
         'driver' => 'workers-ai',
         'key' => env('CLOUDFLARE_AI_API_TOKEN'),
-        'url' => env('WORKERS_AI_URL'),
+
+        // Option A — direct Workers AI API (recommended for development)
+        'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+        // → https://api.cloudflare.com/client/v4/accounts/{id}/ai/v1
+        // Use bare model IDs:  '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+
+        // Option B — Cloudflare AI Gateway (adds observability + caching)
+        // 'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+        // 'gateway' => env('CLOUDFLARE_AI_GATEWAY'),
+        // → https://gateway.ai.cloudflare.com/v1/{id}/{gw}/workers-ai/v1
+        // Use bare model IDs.
+
+        // Option C — explicit URL (escape hatch; only path that hits /compat)
+        // 'url' => env('WORKERS_AI_URL'),
+        // → used as-is. If it ends in /compat, model IDs MUST be prefixed:
+        //   'workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast'
     ],
 ],
 ```
@@ -50,23 +97,22 @@ The service provider is auto-discovered by Laravel. No additional setup needed.
 
 ```env
 CLOUDFLARE_AI_API_TOKEN=your-cloudflare-api-token
-WORKERS_AI_URL=https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_slug}/compat
+CLOUDFLARE_ACCOUNT_ID=your-account-id
+# Optional — set to enable AI Gateway routing
+# CLOUDFLARE_AI_GATEWAY=your-gateway-slug
 ```
 
-> **Note:** The URL must end in `/compat`, not `/workers-ai/v1`. The SDK appends `/chat/completions` automatically.
+Create a Cloudflare API token with `Workers AI: Read` permission at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Find your account ID in the URL of your Cloudflare dashboard.
 
-Create a Cloudflare API token with `Workers AI: Read` permission at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
+### Endpoint and model-ID matrix
 
-### Understanding the `workers-ai/` model prefix
+| Endpoint | URL shape | Model IDs |
+|----------|-----------|-----------|
+| Direct Workers AI | `api.cloudflare.com/client/v4/accounts/{id}/ai/v1` | bare: `@cf/meta/...` |
+| AI Gateway provider path | `gateway.ai.cloudflare.com/v1/{id}/{gw}/workers-ai/v1` | bare: `@cf/meta/...` |
+| AI Gateway universal `/compat` | `gateway.ai.cloudflare.com/v1/{id}/{gw}/compat` | prefixed: `workers-ai/@cf/meta/...` |
 
-The AI Gateway has two OpenAI-compatible endpoints for Workers AI:
-
-| Endpoint | URL | Model format |
-|----------|-----|-------------|
-| Universal (recommended) | `.../compat` | `workers-ai/@cf/meta/...` |
-| Provider-specific | `.../workers-ai/v1` | `@cf/meta/...` |
-
-This package targets the `/compat` endpoint. The `workers-ai/` prefix in model names tells the gateway which provider to route to. The gateway strips the prefix internally — responses return just `@cf/...`.
+The native gateway validates model IDs at request time — a bare model ID against a `/compat` URL throws an `AiException` with the fix in the message. The `/compat` endpoint is the only path that requires the `workers-ai/` prefix; on `/compat` the gateway uses the prefix to route between providers.
 
 ## Usage
 
@@ -204,30 +250,48 @@ writing your own handlers against the same endpoint:
   `withClientRetry(...)` on the Prism request, or disable globally by adding
   `'retry' => false` under `providers.workers-ai` in `config/prism.php`.
 
+## `#[Strict]` mode against Workers AI
+
+`laravel/ai` v0.7's `#[Strict]` attribute opts an agent into OpenAI's strict-JSON-schema mode. Our gateway honors the attribute and threads it into both `ObjectSchema(strict: ...)` (tighter schema generation) and the response_format `strict` flag.
+
+Live testing against Workers AI's `/compat` endpoint (direct API + AI Gateway routes) shows the schema constraints are enforced in both directions — `strict: true` and `strict: false` produce structurally identical responses against the same schema, and unknown properties don't leak through either way. Workers AI returns structured `content` as a JSON object (not a string); the gateway re-serializes it transparently.
+
+The flag is sent honestly per user intent, but Workers AI's documentation doesn't make explicit guarantees about how `strict` interacts with their `/compat` layer. Treat the attribute as a hint that future Workers AI models or modes may take advantage of, not a hard contract.
+
+## Configuration troubleshooting
+
+The config resolver pre-validates common paste-errors and ambiguous configurations before the first request, so you get an actionable message instead of a silent 404 from Cloudflare.
+
+| Error message contains | What's wrong | How to fix |
+|---|---|---|
+| `requires an `account_id` or explicit `url`` | Neither config key set. | Add `account_id` (recommended) or `url` to the provider config. |
+| `both `url` and `account_id` set` | You set both — the resolver doesn't pick one silently. | Remove whichever you don't want. Use `url` only if you need a non-standard endpoint or `/compat`. |
+| ``account_id` looks like a URL` | A full URL was pasted into the `account_id` field. | Use just the bare account ID (32-char hex from `dash.cloudflare.com/<account_id>/...`). |
+| ``account_id` looks malformed` | Slashes or whitespace in the value. | Strip path segments — only the account ID. |
+| ``gateway` looks like a URL` / `looks malformed` | Full URL or path pasted into the `gateway` slug field. | Use just the gateway name (e.g. `production-llm`). For a full custom URL, set `url` instead and drop `account_id`/`gateway`. |
+| `is missing the `workers-ai/` prefix required by the `/compat` endpoint` | Bare model ID (`@cf/...`) on a `/compat` URL. | Either add the `workers-ai/` prefix, or switch to `account_id`/`gateway` config (those use bare IDs). |
+| `has the `workers-ai/` prefix, but the configured endpoint expects bare model IDs` | Prefixed model ID on a non-`/compat` endpoint. | Drop the `workers-ai/` prefix, or switch back to a `/compat` URL by setting `url` directly. |
+
+All errors fire on the first request through the misconfigured provider — there's no boot-time scan. The Prism path raises `InvalidArgumentException`; the Laravel AI path wraps it as `Laravel\Ai\Exceptions\AiException` so it flows through `agent()`'s normal error handling.
+
 ## Compatibility
 
 | Dependency | Supported | Notes |
 |------------|-----------|-------|
-| `prism-php/prism` | `^0.99 \|\| ^0.100` | Full Prism support — `Prism::text()/structured()/embeddings()/stream()` all work on every supported version. |
-| `laravel/ai` `^0.3 – ^0.5` | ✅ Full support | `agent()->prompt(provider: 'workers-ai')` works via the `PrismGateway` subclass. |
-| `laravel/ai` `^0.6` | ⚠️ Prism-only | Upstream removed `PrismGateway`. The Laravel AI bridge auto-disables with a one-time `Log::warning`; Prism standalone keeps working. `agent()->prompt(provider: 'workers-ai')` will throw until v0.5.0 ships. |
-
-### The v0.6 gap and v0.5.0 plan
-
-`laravel/ai` v0.6 removed the `PrismGateway` class this package extended, so the `agent()` integration degrades on that line. If you need `agent()->prompt()` today, stay on `laravel/ai ^0.5` — this package on v0.4.x keeps it working there.
-
-**prism-workers-ai v0.5.0** (upcoming) will restore full `agent()` support on `laravel/ai ^0.6+` by shipping a native Laravel AI gateway, based on the design in [laravel/ai#405](https://github.com/laravel/ai/pull/405). The constructor of `PrismWorkersAi\LaravelAi\WorkersAiProvider` will change in that release — a minor BC break that only affects the small subset of users subclassing it directly.
-
-See [UPGRADING.md](UPGRADING.md) for the migration path as it firms up.
+| `prism-php/prism` | `^0.99 \|\| ^0.100` | Full support on the Prism path — `Prism::text() / structured() / embeddings() / stream()` all work. |
+| `laravel/ai` `^0.7` | ✅ Recommended | Native gateway with v0.7 catchup: `ToolNameResolver`, `#[Strict]` opt-in, `#[TopP]`, `providerOptions` forwarded in embeddings, `reasoning_content` replay across tool-call turns. |
+| `laravel/ai` `^0.6` | ✅ Supported | Native gateway works the same; v0.7-only primitives (Strict, TopP, providerOptions-on-embeddings) silently no-op on this line. |
+| `laravel/ai` `^0.5` | ✅ Supported | Same native gateway, stable contracts. Same v0.7-only no-op caveat applies. |
+| `laravel/ai` `^0.3 \|\| ^0.4` | ⚠️ Best-effort | Older interfaces; pin `prism-workers-ai ^0.4` if you need this line. |
 
 ## How it works
 
-The package registers a `workers-ai` provider at two levels:
+Two independent integrations, neither of which depends on the other:
 
-1. **Prism layer** — via `PrismManager::extend()`, handling the actual HTTP requests with correct content formatting
-2. **Laravel AI SDK layer** — via `AiManager::extend()`, bridging the `workers-ai` driver to the Prism provider
+1. **Prism layer** — `PrismWorkersAi\WorkersAi` registers via `PrismManager::extend()`. Handles `Prism::text()`, `Prism::structured()`, `Prism::stream()`, `Prism::embeddings()` against Workers AI's OpenAI-compatible `/compat` endpoint with the wire-shape adjustments needed (string content, content-as-object handling, present-but-empty assistant messages, string-coerced tool results, embeddings).
+2. **Laravel AI layer** — `PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway` implements `Laravel\Ai\Contracts\Gateway\TextGateway` + `EmbeddingGateway` directly. Owns its own HTTP client, message mapping, SSE streaming, multi-round tool call loop, structured output, and reasoning event emission. Registered via `AiManager::extend()`. Mirrors the native-gateway pattern used by every first-party `laravel/ai` provider.
 
-The Laravel AI SDK bridge includes a `PrismGateway` subclass that overrides `configure()` to pass the driver name as a string to Prism, bypassing the SDK's hardcoded provider enum mapping. This override auto-disables itself when `laravel/ai` adds native support for custom Prism providers ([laravel/ai#283](https://github.com/laravel/ai/issues/283), [laravel/ai#284](https://github.com/laravel/ai/pull/284)).
+Both share `PrismWorkersAi\Cloudflare\*` for wire-shape concerns: error envelope extraction (OpenAI + Cloudflare AI Gateway shapes), explicit-null-tolerant token parsing, JSON Schema empty-properties coercion, retry policy, streamed tool-call delta accumulation. Workers AI quirks land in one place and propagate to both integrations.
 
 ## Automated Setup
 

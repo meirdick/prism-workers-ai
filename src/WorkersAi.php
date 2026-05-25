@@ -17,6 +17,8 @@ use Prism\Prism\Structured\Request as StructuredRequest;
 use Prism\Prism\Structured\Response as StructuredResponse;
 use Prism\Prism\Text\Request as TextRequest;
 use Prism\Prism\Text\Response as TextResponse;
+use PrismWorkersAi\Cloudflare\ModelPrefix;
+use PrismWorkersAi\Cloudflare\RetryPolicy;
 use PrismWorkersAi\Concerns\ExtractsErrorMessage;
 use PrismWorkersAi\Handlers\Embeddings;
 use PrismWorkersAi\Handlers\Stream;
@@ -27,41 +29,36 @@ class WorkersAi extends Provider
 {
     use ExtractsErrorMessage, InitializesClient;
 
-    const KEY = 'workers-ai';
-
     /**
-     * Dashless alias for KEY. Every other provider in the Laravel AI ecosystem
-     * (openai, anthropic, xai, gemini, groq, mistral, deepseek) is a single
-     * lowercase token, so users naturally reach for "workersai" — especially
-     * inside defensive try/catch blocks that would swallow "driver not
-     * supported" errors and silently degrade a feature.
+     * Driver-key constants — kept as aliases to {@see WorkersAiKey} for
+     * backward compatibility with code that imported them off this class
+     * before v0.5.0. The canonical home is `PrismWorkersAi\WorkersAiKey`,
+     * which doesn't drag Prism's autoloader along when read.
      */
-    const KEY_ALIAS = 'workersai';
+    public const KEY = WorkersAiKey::PRIMARY;
+
+    public const KEY_ALIAS = WorkersAiKey::ALIAS;
 
     /**
-     * Ensure the model string includes the workers-ai/ prefix required by
-     * the Cloudflare AI Gateway /compat endpoint.
+     * Resolve the wire-format model ID for the configured endpoint.
+     *
+     * On `/compat` URLs we auto-prefix bare model IDs with `workers-ai/` so
+     * application code can stay endpoint-agnostic. On `/v1` URLs we reject
+     * IDs that came in with the prefix already — Cloudflare 404s those
+     * silently and the upstream error doesn't help the user understand why.
      */
     public function normalizeModel(string $model): string
     {
-        if ($this->modelPrefix !== '' && ! str_starts_with($model, $this->modelPrefix)) {
-            return $this->modelPrefix.$model;
-        }
+        ModelPrefix::validate($this->url, $model);
 
-        return $model;
+        return ModelPrefix::normalize($this->url, $model);
     }
 
     public function __construct(
         #[\SensitiveParameter] public readonly string $apiKey,
         public readonly string $url,
         public readonly bool $retryEnabled = true,
-        public string $modelPrefix = '',
-    ) {
-        if ($this->modelPrefix === '') {
-            // Auto-detect prefix based on endpoint: /compat needs workers-ai/
-            $this->modelPrefix = str_ends_with($this->url, '/compat') ? self::KEY.'/' : '';
-        }
-    }
+    ) {}
 
     #[\Override]
     public function text(TextRequest $request): TextResponse
@@ -126,28 +123,13 @@ class WorkersAi extends Provider
 
     /**
      * Retries transient network/gateway errors (cURL 6/7/28/56, HTTP 502/503/504).
-     * Users can override by passing their own config via `withClientRetry(...)` on
-     * the Prism request.
+     * Delegates to the shared Cloudflare\RetryPolicy so the Laravel AI gateway
+     * applies the same defaults. Override per-request via `withClientRetry(...)`.
      *
      * @return array<mixed>
      */
     protected static function defaultRetry(): array
     {
-        return [
-            3,
-            500,
-            function (\Throwable $exception): bool {
-                if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
-                    return true;
-                }
-
-                if ($exception instanceof RequestException) {
-                    return in_array($exception->response->getStatusCode(), [502, 503, 504], true);
-                }
-
-                return false;
-            },
-            true,
-        ];
+        return RetryPolicy::defaults();
     }
 }

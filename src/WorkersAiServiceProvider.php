@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace PrismWorkersAi;
 
-use Illuminate\Support\Facades\Log;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\ServiceProvider;
-use Prism\Prism\PrismManager;
-use ReflectionMethod;
-use ReflectionUnionType;
+use PrismWorkersAi\Cloudflare\BaseUrl;
 
 class WorkersAiServiceProvider extends ServiceProvider
 {
@@ -21,30 +19,47 @@ class WorkersAiServiceProvider extends ServiceProvider
     /**
      * Register the workers-ai provider with Prism's PrismManager.
      *
-     * This enables: Prism::text()->using('workers-ai', $model)->asText()
+     * Enables: Prism::text()->using('workers-ai', $model)->asText()
      * Also registered under the dashless alias "workersai".
      */
     protected function registerWithPrism(): void
     {
-        $this->app->extend(PrismManager::class, function (PrismManager $manager) {
+        // prism-php/prism is an optional dependency as of v0.5.0. Skip the
+        // Prism manager registration entirely when Prism isn't installed —
+        // the Laravel AI bridge still wires up via its own path. Users who
+        // want `Prism::text()->using('workers-ai', ...)` need to add
+        // prism-php/prism to their own composer.json.
+        if (! class_exists(\Prism\Prism\PrismManager::class)) {
+            return;
+        }
+
+        $this->app->extend(\Prism\Prism\PrismManager::class, function (\Prism\Prism\PrismManager $manager) {
             $creator = function ($app, array $config): WorkersAi {
-                // Alias resolution: fall back to the primary `workers-ai` config
-                // block when the alias block is missing `url`, so users don't
+                // Alias resolution: when the alias block is missing config keys,
+                // fall back to the primary `workers-ai` block so users don't
                 // duplicate config. Caller-provided values win on key collision.
-                if (empty($config['url'])) {
-                    $primary = $app['config']->get('prism.providers.'.WorkersAi::KEY, []);
+                if (empty($config['url']) && empty($config['account_id'])) {
+                    $primary = $app['config']->get('prism.providers.'.WorkersAiKey::PRIMARY, []);
                     $config = array_merge($primary, $config);
                 }
 
+                // BaseUrl handles all three shapes (url | account_id+gateway |
+                // account_id) with the same validation as the Laravel AI path.
+                // Empty config returns '' for backward compat with prior versions
+                // that allowed instantiation before any request.
+                $url = (! empty($config['url']) || ! empty($config['account_id']))
+                    ? BaseUrl::build($config)
+                    : '';
+
                 return new WorkersAi(
                     apiKey: $config['api_key'] ?? $config['key'] ?? '',
-                    url: $config['url'] ?? '',
+                    url: $url,
                     retryEnabled: (bool) ($config['retry'] ?? true),
                 );
             };
 
-            $manager->extend(WorkersAi::KEY, $creator);
-            $manager->extend(WorkersAi::KEY_ALIAS, $creator);
+            $manager->extend(WorkersAiKey::PRIMARY, $creator);
+            $manager->extend(WorkersAiKey::ALIAS, $creator);
 
             return $manager;
         });
@@ -53,14 +68,12 @@ class WorkersAiServiceProvider extends ServiceProvider
     /**
      * Register the workers-ai driver with Laravel AI SDK's AiManager.
      *
-     * This enables: agent()->prompt('Hello', provider: 'workers-ai')
-     * Also registered under the dashless alias "workersai".
+     * Enables: agent()->prompt('Hello', provider: 'workers-ai')
      *
-     * When laravel/ai natively supports custom Prism providers (i.e.
-     * toPrismProvider() returns string|PrismProvider), we skip the
-     * gateway override and use the standard PrismGateway directly.
-     *
-     * @see https://github.com/laravel/ai/issues/283
+     * Uses our own native gateway (PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway)
+     * — no longer extends laravel/ai's PrismGateway, which was removed upstream
+     * in v0.6.1. Works on laravel/ai v0.5 and v0.6+ via the stable TextGateway
+     * and EmbeddingGateway contracts.
      */
     protected function registerWithLaravelAi(): void
     {
@@ -68,57 +81,14 @@ class WorkersAiServiceProvider extends ServiceProvider
             return;
         }
 
-        if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
-            Log::warning(
-                'meirdick/prism-workers-ai: laravel/ai v0.6+ removed PrismGateway. '
-                . 'The agent()->prompt(provider: "workers-ai") integration is disabled in this release. '
-                . 'Prism standalone (Prism::text()->using("workers-ai", ...)) continues to work. '
-                . 'prism-workers-ai v0.5.0 (upcoming) will ship a native Laravel AI gateway — '
-                . 'pin to v0.5.0+ when it lands, or stay on laravel/ai v0.5 to keep agent() working today. '
-                . 'See https://github.com/meirdick/prism-workers-ai/blob/main/UPGRADING.md'
+        $this->app->afterResolving(\Laravel\Ai\AiManager::class, function ($manager) {
+            $creator = fn ($app, array $config) => new LaravelAi\WorkersAiProvider(
+                $config,
+                $app->make(Dispatcher::class),
             );
 
-            return;
-        }
-
-        $useOverride = $this->needsGatewayOverride();
-
-        $this->app->afterResolving(\Laravel\Ai\AiManager::class, function ($manager) use ($useOverride) {
-            $creator = function ($app, array $config) use ($useOverride) {
-                $gateway = $useOverride
-                    ? new LaravelAi\WorkersAiGateway($app['events'])
-                    : new \Laravel\Ai\Gateway\Prism\PrismGateway($app['events']);
-
-                return new LaravelAi\WorkersAiProvider(
-                    $gateway,
-                    $config,
-                    $app->make(\Illuminate\Contracts\Events\Dispatcher::class),
-                );
-            };
-
-            $manager->extend(WorkersAi::KEY, $creator);
-            $manager->extend(WorkersAi::KEY_ALIAS, $creator);
+            $manager->extend(WorkersAiKey::PRIMARY, $creator);
+            $manager->extend(WorkersAiKey::ALIAS, $creator);
         });
-    }
-
-    /**
-     * Check whether PrismGateway::toPrismProvider() still requires the
-     * gateway override. Returns false once laravel/ai merges support
-     * for custom providers (return type becomes PrismProvider|string).
-     */
-    protected function needsGatewayOverride(): bool
-    {
-        if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
-            return false;
-        }
-
-        $method = new ReflectionMethod(
-            \Laravel\Ai\Gateway\Prism\PrismGateway::class,
-            'toPrismProvider'
-        );
-
-        // If the return type is a union (PrismProvider|string), the
-        // upstream fix landed — no override needed.
-        return ! ($method->getReturnType() instanceof ReflectionUnionType);
     }
 }

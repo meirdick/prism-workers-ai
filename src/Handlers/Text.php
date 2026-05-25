@@ -19,6 +19,7 @@ use Prism\Prism\ValueObjects\Messages\ToolResultMessage;
 use Prism\Prism\ValueObjects\Meta;
 use Prism\Prism\ValueObjects\ToolCall;
 use Prism\Prism\ValueObjects\ToolResult;
+use PrismWorkersAi\Cloudflare\ToolCallList;
 use PrismWorkersAi\Concerns\AppliesSessionAffinity;
 use PrismWorkersAi\Concerns\ExtractsThinking;
 use PrismWorkersAi\Concerns\ForwardsProviderOptions;
@@ -69,7 +70,7 @@ class Text
      */
     protected function handleToolCalls(array $data, Request $request): TextResponse
     {
-        $toolCalls = $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls') ?? []);
+        $toolCalls = $this->mapToolCalls(ToolCallList::fromResponse($data));
 
         if ($toolCalls === []) {
             throw new PrismException('Workers AI: finish reason is tool_calls but no tool calls found in response');
@@ -160,7 +161,7 @@ class Text
         $this->responseBuilder->addStep(new Step(
             text: $content,
             finishReason: $this->mapFinishReason($data),
-            toolCalls: $this->mapToolCalls(data_get($data, 'choices.0.message.tool_calls') ?? []),
+            toolCalls: $this->mapToolCalls(ToolCallList::fromResponse($data)),
             toolResults: $toolResults,
             providerToolCalls: [],
             usage: $this->mapUsage(data_get($data, 'usage') ?? []),

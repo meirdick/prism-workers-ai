@@ -1,18 +1,20 @@
 {
     "name": "meirdick/prism-workers-ai",
-    "description": "Cloudflare Workers AI provider for Prism PHP — routes through AI Gateway /compat endpoint",
+    "description": "Cloudflare Workers AI provider for Laravel AI SDK and Prism PHP. Native Laravel AI gateway with no Prism dependency, plus optional Prism integration.",
     "type": "library",
     "license": "MIT",
     "require": {
-        "php": "^8.2",
-        "prism-php/prism": "^0.99 || ^0.100"
+        "php": "^8.2"
     },
     "suggest": {
-        "laravel/ai": "Required for agent() integration (^0.3 || ^0.4 || ^0.5 || ^0.6). On ^0.6 the Laravel AI bridge is disabled (PrismGateway was removed upstream) — Prism::text()->using('workers-ai', ...) continues to work. Full agent() support returns in prism-workers-ai v0.5.0."
+        "laravel/ai": "Required for agent() integration. Native gateway works on ^0.5 || ^0.6 || ^0.7 with no Prism involvement. Recommended for new projects.",
+        "prism-php/prism": "Required for Prism::text()->using('workers-ai', ...). Compatible with ^0.99 || ^0.100. Optional as of v0.5.0 — only needed if you use the Prism integration."
     },
     "require-dev": {
-        "orchestra/testbench": "^9.0",
-        "pestphp/pest": "^3.0"
+        "laravel/ai": "^0.7.0",
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^3.0",
+        "prism-php/prism": "^0.99 || ^0.100"
     },
     "autoload": {
         "psr-4": {

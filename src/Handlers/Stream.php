@@ -33,6 +33,8 @@ use Prism\Prism\ValueObjects\Messages\ToolResultMessage;
 use Prism\Prism\ValueObjects\ToolCall;
 use Prism\Prism\ValueObjects\Usage;
 use Psr\Http\Message\StreamInterface;
+use PrismWorkersAi\Cloudflare\StreamToolCallAccumulator;
+use PrismWorkersAi\Cloudflare\ToolCallList;
 use PrismWorkersAi\Concerns\AppliesSessionAffinity;
 use PrismWorkersAi\Concerns\ExtractsThinking;
 use PrismWorkersAi\Concerns\ForwardsProviderOptions;
@@ -283,44 +285,20 @@ class Stream
      */
     protected function hasToolCalls(array $data): bool
     {
-        return ! empty(data_get($data, 'choices.0.delta.tool_calls'));
+        return ToolCallList::fromStreamDelta($data) !== [];
     }
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array<int, array<string, mixed>>  $toolCalls
-     * @return array<int, array<string, mixed>>
+     * @param  array<int, array{id: string, name: string, arguments: string}>  $toolCalls
+     * @return array<int, array{id: string, name: string, arguments: string}>
      */
     protected function extractToolCalls(array $data, array $toolCalls): array
     {
-        $deltaToolCalls = data_get($data, 'choices.0.delta.tool_calls') ?? [];
-
-        foreach ($deltaToolCalls as $deltaToolCall) {
-            $index = data_get($deltaToolCall, 'index', 0);
-
-            if (! isset($toolCalls[$index])) {
-                $toolCalls[$index] = [
-                    'id' => '',
-                    'name' => '',
-                    'arguments' => '',
-                ];
-            }
-
-            if (($id = data_get($deltaToolCall, 'id')) !== null) {
-                $toolCalls[$index]['id'] = $id;
-            }
-
-            if (($name = data_get($deltaToolCall, 'function.name')) !== null) {
-                $toolCalls[$index]['name'] = $name;
-            }
-
-            // `!== null` (not truthy): argument deltas can legitimately be "0" or ""
-            if (($arguments = data_get($deltaToolCall, 'function.arguments')) !== null) {
-                $toolCalls[$index]['arguments'] .= $arguments;
-            }
-        }
-
-        return $toolCalls;
+        return StreamToolCallAccumulator::append(
+            $toolCalls,
+            ToolCallList::fromStreamDelta($data),
+        );
     }
 
     /**

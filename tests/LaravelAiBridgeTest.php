@@ -2,11 +2,22 @@
 
 declare(strict_types=1);
 
-use Prism\Prism\PrismManager;
 use PrismWorkersAi\WorkersAi;
 
+// Helper so each Prism-specific test self-skips when prism-php/prism is
+// genuinely absent from vendor/. Lets the same file run under the default,
+// prism-only, and no-prism CI jobs.
+function skipIfPrismMissing(\PHPUnit\Framework\TestCase $test): void
+{
+    if (! class_exists(\Prism\Prism\PrismManager::class)) {
+        $test->markTestSkipped('prism-php/prism is not installed in this matrix job');
+    }
+}
+
 it('registers workers-ai provider with PrismManager', function () {
-    $manager = app(PrismManager::class);
+    skipIfPrismMissing($this);
+
+    $manager = app(\Prism\Prism\PrismManager::class);
 
     $provider = $manager->resolve('workers-ai');
 
@@ -14,7 +25,9 @@ it('registers workers-ai provider with PrismManager', function () {
 });
 
 it('resolves provider with correct config from prism.providers', function () {
-    $manager = app(PrismManager::class);
+    skipIfPrismMissing($this);
+
+    $manager = app(\Prism\Prism\PrismManager::class);
 
     $provider = $manager->resolve('workers-ai');
 
@@ -26,11 +39,7 @@ it('registers workers-ai driver with AiManager when laravel/ai is installed', fu
     if (! class_exists(\Laravel\Ai\AiManager::class)) {
         $this->markTestSkipped('laravel/ai is not installed');
     }
-    if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
-        $this->markTestSkipped('laravel/ai v0.6+ removed PrismGateway — Laravel AI bridge is disabled until prism-workers-ai v0.5.0');
-    }
 
-    // Configure the ai provider before resolving AiManager
     config()->set('ai.providers.workers-ai', [
         'driver' => 'workers-ai',
         'key' => 'test-key',
@@ -46,7 +55,9 @@ it('registers workers-ai driver with AiManager when laravel/ai is installed', fu
 });
 
 it('registers dashless "workersai" alias with PrismManager', function () {
-    $manager = app(PrismManager::class);
+    skipIfPrismMissing($this);
+
+    $manager = app(\Prism\Prism\PrismManager::class);
 
     $provider = $manager->resolve('workersai');
 
@@ -56,9 +67,6 @@ it('registers dashless "workersai" alias with PrismManager', function () {
 it('registers dashless "workersai" alias with AiManager when laravel/ai is installed', function () {
     if (! class_exists(\Laravel\Ai\AiManager::class)) {
         $this->markTestSkipped('laravel/ai is not installed');
-    }
-    if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
-        $this->markTestSkipped('laravel/ai v0.6+ removed PrismGateway — Laravel AI bridge is disabled until prism-workers-ai v0.5.0');
     }
 
     config()->set('ai.providers.workersai', [
@@ -75,18 +83,21 @@ it('registers dashless "workersai" alias with AiManager when laravel/ai is insta
     expect($provider)->toBeInstanceOf(\PrismWorkersAi\LaravelAi\WorkersAiProvider::class);
 });
 
-it('auto-detects upstream fix via reflection', function () {
-    $serviceProvider = app()->getProvider(\PrismWorkersAi\WorkersAiServiceProvider::class);
-
-    $method = new ReflectionMethod($serviceProvider, 'needsGatewayOverride');
-
-    $result = $method->invoke($serviceProvider);
-
-    if (! class_exists(\Laravel\Ai\Gateway\Prism\PrismGateway::class)) {
-        // No laravel/ai installed — should not need override
-        expect($result)->toBeFalse();
-    } else {
-        // laravel/ai installed but upstream fix not yet merged — needs override
-        expect($result)->toBeBool();
+it('lazy-instantiates a native gateway on the WorkersAiProvider', function () {
+    if (! class_exists(\Laravel\Ai\AiManager::class)) {
+        $this->markTestSkipped('laravel/ai is not installed');
     }
+
+    config()->set('ai.providers.workers-ai', [
+        'driver' => 'workers-ai',
+        'key' => 'test-key',
+        'account_id' => 'test-account',
+        'name' => 'workers-ai',
+    ]);
+
+    $provider = app(\Laravel\Ai\AiManager::class)->instance('workers-ai');
+
+    expect($provider->textGateway())->toBeInstanceOf(\PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway::class);
+    expect($provider->embeddingGateway())->toBeInstanceOf(\PrismWorkersAi\LaravelAi\Gateway\WorkersAiGateway::class);
+    expect($provider->textGateway())->toBe($provider->embeddingGateway());
 });

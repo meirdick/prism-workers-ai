@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace PrismWorkersAi\Concerns;
 
 use Prism\Prism\ValueObjects\Usage;
+use PrismWorkersAi\Cloudflare\UsageTokens;
 
 trait MapsUsage
 {
     /**
-     * Build Usage from a `usage` subtree. Coalesces explicit `null` on token
-     * fields to 0 because Workers AI /compat (Kimi K2.5/K2.6) emits literal
-     * `"prompt_tokens": null` instead of omitting the key — and `data_get`
-     * only substitutes a default for missing keys, not explicit nulls.
+     * Build Prism's Usage from a Workers AI `usage` subtree. The wire-shape
+     * coalescing (explicit-null tolerance, optional cached/reasoning tokens)
+     * lives in PrismWorkersAi\Cloudflare\UsageTokens so the Laravel AI gateway
+     * can reuse the exact same parsing rules without duplication.
      *
      * @param  array<string, mixed>  $usage
      */
     protected function mapUsage(array $usage): Usage
     {
         return new Usage(
-            promptTokens: data_get($usage, 'prompt_tokens') ?? 0,
-            completionTokens: data_get($usage, 'completion_tokens') ?? 0,
-            cacheReadInputTokens: data_get($usage, 'prompt_tokens_details.cached_tokens'),
-            thoughtTokens: data_get($usage, 'reasoning_tokens'),
+            promptTokens: UsageTokens::promptTokens($usage),
+            completionTokens: UsageTokens::completionTokens($usage),
+            cacheReadInputTokens: UsageTokens::cachedTokens($usage),
+            thoughtTokens: UsageTokens::reasoningTokens($usage),
         );
     }
 }
