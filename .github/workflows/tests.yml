@@ -121,29 +121,8 @@ jobs:
       - name: Run tests
         run: vendor/bin/pest
 
-  laravel-ai-v05-compat:
-    # Backward-compat against laravel/ai ^0.5.x — the last line that still
-    # ships PrismGateway. The native gateway uses only stable contracts so
-    # v0.5.x should still work, modulo a few v0.7-only primitives (TopP
-    # attribute, providerOptions on embeddings, Strict attribute) that
-    # silently no-op on older laravel/ai versions.
-    runs-on: ubuntu-latest
-    name: laravel/ai ^0.5 compat
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          coverage: none
-
-      - name: Pin laravel/ai to ^0.5 + matching testbench
-        run: composer require --dev --no-interaction --no-update 'laravel/ai:^0.5.1' 'orchestra/testbench:^9.0'
-
-      - name: Install dependencies
-        run: composer update --no-interaction --prefer-dist --with-all-dependencies
-
-      - name: Run tests
-        run: vendor/bin/pest
+  # laravel/ai ^0.5 backstop intentionally dropped: the orchestra/testbench
+  # ^9 + pestphp/pest ^3 + laravel/framework ^12 combination doesn't resolve
+  # via composer (incompatible phpunit transitives), so the matrix entry was
+  # noise that never represented a real user workflow. ^0.5 callers should
+  # pin meirdick/prism-workers-ai ^0.4 — see README compatibility table.
